@@ -1,32 +1,90 @@
+import { supabase } from "@/integrations/supabase/client";
 import { SavedItem, AppSettings, FolderDef, DEFAULT_FOLDERS } from "./types";
 
-const HISTORY_KEY = "declutter_history";
 const SETTINGS_KEY = "declutter_settings";
+const SYNC_KEY_KEY = "declutter_sync_key";
 
-export function getHistory(): SavedItem[] {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
-  } catch {
+// ─── Sync Key ────────────────────────────────────────────
+
+export function getSyncKey(): string {
+  let key = localStorage.getItem(SYNC_KEY_KEY);
+  if (!key) {
+    key = crypto.randomUUID();
+    localStorage.setItem(SYNC_KEY_KEY, key);
+  }
+  return key;
+}
+
+export function setSyncKey(key: string) {
+  localStorage.setItem(SYNC_KEY_KEY, key);
+}
+
+// ─── Items (Supabase) ────────────────────────────────────
+
+export async function getHistory(): Promise<SavedItem[]> {
+  const syncKey = getSyncKey();
+  const { data, error } = await supabase
+    .from("items")
+    .select("*")
+    .eq("sync_key", syncKey)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Failed to fetch items:", error);
     return [];
   }
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    type: row.type,
+    folder: row.folder || "",
+    title: row.title,
+    content: row.content || "",
+    datetime: row.datetime || undefined,
+    confirmed: row.confirmed,
+    dismissed: false,
+    savedAt: row.created_at,
+    done: row.done || false,
+  }));
 }
 
-export function saveItems(items: SavedItem[]) {
-  const existing = getHistory();
-  localStorage.setItem(HISTORY_KEY, JSON.stringify([...items, ...existing]));
+export async function saveItems(items: SavedItem[]) {
+  const syncKey = getSyncKey();
+  const rows = items.map((item) => ({
+    id: item.id,
+    sync_key: syncKey,
+    type: item.type,
+    folder: item.folder || null,
+    title: item.title,
+    content: item.content || "",
+    datetime: item.datetime || null,
+    done: item.done || false,
+    confirmed: true,
+  }));
+
+  const { error } = await supabase.from("items").upsert(rows);
+  if (error) console.error("Failed to save items:", error);
 }
 
-export function toggleItemDone(id: string) {
-  const history = getHistory();
-  const updated = history.map((item) =>
-    item.id === id ? { ...item, done: !item.done } : item
-  );
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+export async function toggleItemDone(id: string) {
+  // First get current state
+  const { data } = await supabase.from("items").select("done").eq("id", id).single();
+  if (!data) return;
+
+  const { error } = await supabase
+    .from("items")
+    .update({ done: !data.done })
+    .eq("id", id);
+  if (error) console.error("Failed to toggle item:", error);
 }
 
-export function clearHistory() {
-  localStorage.removeItem(HISTORY_KEY);
+export async function clearHistory() {
+  const syncKey = getSyncKey();
+  const { error } = await supabase.from("items").delete().eq("sync_key", syncKey);
+  if (error) console.error("Failed to clear history:", error);
 }
+
+// ─── Settings (localStorage only — device-specific) ─────
 
 export function getSettings(): AppSettings {
   try {
