@@ -25,7 +25,7 @@ export function FolderManager({ open, onOpenChange, onFoldersChanged }: FolderMa
   const [isCreating, setIsCreating] = useState(false);
   const [label, setLabel] = useState("");
   const [emoji, setEmoji] = useState("📁");
-  const [color, setColor] = useState(FOLDER_COLORS[0]);
+  const [color, setColor] = useState<string>(FOLDER_COLORS[0]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const folders = getAllFolders();
