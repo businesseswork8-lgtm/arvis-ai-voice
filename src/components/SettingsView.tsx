@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { getSettings, saveSettings, clearHistory, getSyncKey, setSyncKey } from "@/lib/storage";
-import { FolderDef } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Trash2, Copy, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface SettingsViewProps {
@@ -15,8 +14,6 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [syncKey, setSyncKeyState] = useState(getSyncKey);
   const [editSyncKey, setEditSyncKey] = useState("");
   const [showEditSync, setShowEditSync] = useState(false);
-  const [newFolderLabel, setNewFolderLabel] = useState("");
-  const [newFolderEmoji, setNewFolderEmoji] = useState("📁");
 
   const save = (updated: typeof settings) => {
     setSettings(updated);
@@ -31,7 +28,6 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const applySyncKey = () => {
     const trimmed = editSyncKey.trim();
     if (!trimmed) return;
-    // Basic UUID validation
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
       toast.error("Invalid sync key format. Must be a UUID.");
       return;
@@ -41,23 +37,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setShowEditSync(false);
     setEditSyncKey("");
     toast.success("Sync key updated! Data will sync from the new key.");
-    // Reload to fetch data with new key
     window.location.reload();
-  };
-
-  const addFolder = () => {
-    if (!newFolderLabel.trim()) return;
-    const key = newFolderLabel.toLowerCase().replace(/\s+/g, "-");
-    const folder: FolderDef = { key, label: newFolderLabel.trim(), emoji: newFolderEmoji };
-    save({ ...settings, customFolders: [...settings.customFolders, folder] });
-    setNewFolderLabel("");
-    setNewFolderEmoji("📁");
-    toast.success("Folder added");
-  };
-
-  const removeFolder = (key: string) => {
-    save({ ...settings, customFolders: settings.customFolders.filter((f) => f.key !== key) });
-    toast.success("Folder removed");
   };
 
   return (
@@ -84,7 +64,6 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               <Copy className="w-4 h-4" />
             </Button>
           </div>
-
           {!showEditSync ? (
             <Button variant="ghost" size="sm" onClick={() => setShowEditSync(true)} className="text-muted-foreground">
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
@@ -94,17 +73,12 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <div className="space-y-2 bg-secondary/30 rounded-xl p-3">
               <p className="text-xs text-muted-foreground">Paste a sync key from another device:</p>
               <div className="flex gap-2">
-                <Input
-                  value={editSyncKey}
-                  onChange={(e) => setEditSyncKey(e.target.value)}
+                <Input value={editSyncKey} onChange={(e) => setEditSyncKey(e.target.value)}
                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  className="flex-1 bg-secondary/50 border-border text-foreground font-mono text-xs"
-                />
+                  className="flex-1 bg-secondary/50 border-border text-foreground font-mono text-xs" />
                 <Button size="sm" onClick={applySyncKey}>Apply</Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowEditSync(false)} className="text-xs text-muted-foreground">
-                Cancel
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowEditSync(false)} className="text-xs text-muted-foreground">Cancel</Button>
             </div>
           )}
         </div>
@@ -112,13 +86,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         {/* API Key */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Google Gemini API Key</label>
-          <Input
-            type="password"
-            value={settings.apiKey}
-            onChange={(e) => save({ ...settings, apiKey: e.target.value })}
-            placeholder="AIza..."
-            className="bg-secondary/50 border-border text-foreground"
-          />
+          <Input type="password" value={settings.apiKey} onChange={(e) => save({ ...settings, apiKey: e.target.value })}
+            placeholder="AIza..." className="bg-secondary/50 border-border text-foreground" />
           <p className="text-xs text-muted-foreground">
             Get your key at{" "}
             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-accent underline">
@@ -130,34 +99,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         {/* Model */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Model</label>
-          <Input
-            value={settings.model}
-            onChange={(e) => save({ ...settings, model: e.target.value })}
-            className="bg-secondary/50 border-border text-foreground"
-          />
-        </div>
-
-        {/* Custom Folders */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">Custom Folders</label>
-          {settings.customFolders.map((f) => (
-            <div key={f.key} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-2">
-              <span className="text-sm text-foreground">{f.emoji} {f.label}</span>
-              <button onClick={() => removeFolder(f.key)} className="text-destructive hover:text-destructive/80">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <Input value={newFolderEmoji} onChange={(e) => setNewFolderEmoji(e.target.value)}
-              className="w-14 bg-secondary/50 border-border text-foreground text-center" maxLength={2} />
-            <Input value={newFolderLabel} onChange={(e) => setNewFolderLabel(e.target.value)}
-              placeholder="Folder name" className="flex-1 bg-secondary/50 border-border text-foreground"
-              onKeyDown={(e) => e.key === "Enter" && addFolder()} />
-            <Button size="icon" onClick={addFolder} className="bg-primary text-primary-foreground">
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
+          <Input value={settings.model} onChange={(e) => save({ ...settings, model: e.target.value })}
+            className="bg-secondary/50 border-border text-foreground" />
         </div>
 
         {/* Clear Data */}
