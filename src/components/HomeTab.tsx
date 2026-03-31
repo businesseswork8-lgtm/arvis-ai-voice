@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { format, isToday, isBefore, parseISO, startOfDay } from "date-fns";
-import { getHistory, getAllFolders } from "@/lib/storage";
-import { SavedItem } from "@/lib/types";
+import { format, isToday, isBefore, parseISO } from "date-fns";
+import { getAllFolders } from "@/lib/storage";
+import { useSyncedItems } from "@/hooks/useSyncedItems";
 import { CalendarDays, ListTodo, Bell, Lightbulb } from "lucide-react";
 
 export function HomeTab() {
-  const history = getHistory();
+  const { items: history, loading } = useSyncedItems();
   const folders = getAllFolders();
   const now = new Date();
   const greeting = getGreeting();
@@ -23,9 +23,16 @@ export function HomeTab() {
     return upcoming[0] || null;
   }, [history]);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 pt-4 pb-36 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">
           <span className="text-primary">De</span>
@@ -36,11 +43,8 @@ export function HomeTab() {
         </p>
       </div>
 
-      {/* Today's Summary */}
       <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-          Today's Summary
-        </h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's Summary</h2>
         <div className="grid grid-cols-2 gap-3">
           <SummaryChip icon={<ListTodo className="w-4 h-4" />} label="Tasks" value={tasks.length} />
           <SummaryChip icon={<CalendarDays className="w-4 h-4" />} label="Events today" value={todayEvents.length} />
@@ -52,40 +56,30 @@ export function HomeTab() {
             <p className="text-xs text-muted-foreground">Next up</p>
             <p className="text-sm font-medium text-foreground">{nextEvent.title}</p>
             {nextEvent.datetime && (
-              <p className="text-xs text-primary mt-0.5">
-                {format(parseISO(nextEvent.datetime), "MMM d, h:mm a")}
-              </p>
+              <p className="text-xs text-primary mt-0.5">{format(parseISO(nextEvent.datetime), "MMM d, h:mm a")}</p>
             )}
           </div>
         )}
       </div>
 
-      {/* Pending Tasks Preview */}
       {tasks.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Pending Tasks
-          </h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pending Tasks</h2>
           {tasks.slice(0, 3).map((task) => (
             <div key={task.id} className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
               <div className="w-5 h-5 rounded-full border-2 border-primary/50 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-                {task.datetime && (
-                  <p className="text-xs text-muted-foreground">{format(parseISO(task.datetime), "MMM d")}</p>
-                )}
+                {task.datetime && <p className="text-xs text-muted-foreground">{format(parseISO(task.datetime), "MMM d")}</p>}
               </div>
               {task.folder && (
-                <span className="text-[10px] bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">
-                  {task.folder}
-                </span>
+                <span className="text-[10px] bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">{task.folder}</span>
               )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Folders */}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Folders</h2>
         <div className="grid grid-cols-2 gap-2">
