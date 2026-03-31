@@ -45,7 +45,7 @@ Return a JSON array of items. Only return the JSON array, nothing else.`;
   }
 
   const data = await response.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+  const raw = data.choices?.[0]?.message?.content || "[]";
 
   let jsonStr = raw.trim();
   if (jsonStr.startsWith("```")) {
