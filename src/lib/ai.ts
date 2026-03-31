@@ -1,3 +1,4 @@
+
 import { ExtractedItem } from "./types";
 import { getAllFolders } from "./storage";
 
@@ -18,23 +19,28 @@ For each item return a JSON object with:
 - content: expanded description
 - datetime: ISO 8601 string if a date/time was mentioned, otherwise null
 
-Return a JSON array of items. Only return the JSON array, nothing else.`;
+Return a JSON array of items. Only return the JSON array, nothing else. No markdown, no explanation.`;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: transcript },
+        contents: [
+          {
+            parts: [
+              {
+                text: `${systemPrompt}\n\nHere is the transcript:\n${transcript}`,
+              },
+            ],
+          },
         ],
-        temperature: 0.3,
+        generationConfig: {
+          temperature: 0.3,
+        },
       }),
     }
   );
@@ -45,7 +51,7 @@ Return a JSON array of items. Only return the JSON array, nothing else.`;
   }
 
   const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content || "[]";
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
 
   let jsonStr = raw.trim();
   if (jsonStr.startsWith("```")) {
