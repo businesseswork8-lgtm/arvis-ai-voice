@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      items: {
+        Row: {
+          confirmed: boolean
+          content: string | null
+          created_at: string
+          datetime: string | null
+          done: boolean
+          folder: string | null
+          id: string
+          sync_key: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          confirmed?: boolean
+          content?: string | null
+          created_at?: string
+          datetime?: string | null
+          done?: boolean
+          folder?: string | null
+          id?: string
+          sync_key: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          confirmed?: boolean
+          content?: string | null
+          created_at?: string
+          datetime?: string | null
+          done?: boolean
+          folder?: string | null
+          id?: string
+          sync_key?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
