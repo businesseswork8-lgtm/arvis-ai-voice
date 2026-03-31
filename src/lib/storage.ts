@@ -27,7 +27,7 @@ export function getSettings(): AppSettings {
   } catch {}
   return {
     apiKey: "",
-    model: "openai/gpt-oss-120b:free",
+    model: "gemini-2.0-flash",
     customFolders: [],
   };
 }

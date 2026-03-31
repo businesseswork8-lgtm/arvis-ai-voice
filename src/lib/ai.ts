@@ -20,23 +20,19 @@ For each item return a JSON object with:
 
 Return a JSON array of items. Only return the JSON array, nothing else.`;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": window.location.origin,
-      "X-Title": "Declutter",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: transcript },
-      ],
-      temperature: 0.3,
-    }),
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          { role: "user", parts: [{ text: `${systemPrompt}\n\n---\n\nTranscript:\n${transcript}` }] },
+        ],
+        generationConfig: { temperature: 0.3 },
+      }),
+    }
+  );
 
   if (!response.ok) {
     const err = await response.text();
@@ -44,9 +40,8 @@ Return a JSON array of items. Only return the JSON array, nothing else.`;
   }
 
   const data = await response.json();
-  const raw = data.choices?.[0]?.message?.content || "[]";
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
 
-  // Parse JSON from the response, stripping markdown fences if present
   let jsonStr = raw.trim();
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
