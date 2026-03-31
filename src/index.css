@@ -1,96 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 234 40% 3%;
+    --foreground: 220 20% 90%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 234 30% 7%;
+    --card-foreground: 220 20% 90%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 234 30% 7%;
+    --popover-foreground: 220 20% 90%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 245 80% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 234 25% 12%;
+    --secondary-foreground: 220 20% 85%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 234 20% 15%;
+    --muted-foreground: 220 10% 50%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 185 80% 50%;
+    --accent-foreground: 234 40% 3%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 234 20% 15%;
+    --input: 234 20% 15%;
+    --ring: 245 80% 60%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    --glow-primary: 245 80% 60%;
+    --glow-accent: 185 80% 50%;
+    --recording: 0 72% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 234 30% 5%;
+    --sidebar-foreground: 220 20% 90%;
+    --sidebar-primary: 245 80% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 234 25% 12%;
+    --sidebar-accent-foreground: 220 20% 90%;
+    --sidebar-border: 234 20% 15%;
+    --sidebar-ring: 245 80% 60%;
   }
 }
 
@@ -100,6 +57,65 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', sans-serif;
   }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.4),
+                0 0 60px hsl(var(--glow-primary) / 0.15);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 15px hsl(var(--glow-accent) / 0.3),
+                0 0 40px hsl(var(--glow-accent) / 0.1);
+  }
+
+  .glow-recording {
+    box-shadow: 0 0 25px hsl(var(--recording) / 0.5),
+                0 0 80px hsl(var(--recording) / 0.2);
+  }
+
+  .scanline-overlay {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      hsl(var(--primary) / 0.03) 2px,
+      hsl(var(--primary) / 0.03) 4px
+    );
+  }
+}
+
+@keyframes mic-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.4),
+                0 0 60px hsl(var(--glow-primary) / 0.15);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px hsl(var(--glow-primary) / 0.6),
+                0 0 80px hsl(var(--glow-primary) / 0.25);
+  }
+}
+
+@keyframes mic-recording {
+  0%, 100% {
+    box-shadow: 0 0 25px hsl(var(--recording) / 0.5),
+                0 0 80px hsl(var(--recording) / 0.2),
+                0 0 0 0 hsl(var(--recording) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 35px hsl(var(--recording) / 0.7),
+                0 0 100px hsl(var(--recording) / 0.3),
+                0 0 0 15px hsl(var(--recording) / 0);
+  }
+}
+
+@keyframes wave-bar {
+  0%, 100% { height: 8px; }
+  50% { height: 24px; }
 }
