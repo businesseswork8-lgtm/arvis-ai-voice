@@ -16,6 +16,14 @@ export function saveItems(items: SavedItem[]) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify([...items, ...existing]));
 }
 
+export function toggleItemDone(id: string) {
+  const history = getHistory();
+  const updated = history.map((item) =>
+    item.id === id ? { ...item, done: !item.done } : item
+  );
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+}
+
 export function clearHistory() {
   localStorage.removeItem(HISTORY_KEY);
 }
