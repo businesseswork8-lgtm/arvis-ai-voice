@@ -67,7 +67,6 @@ export async function saveItems(items: SavedItem[]) {
 }
 
 export async function toggleItemDone(id: string) {
-  // First get current state
   const { data } = await supabase.from("items").select("done").eq("id", id).single();
   if (!data) return;
 
@@ -76,6 +75,16 @@ export async function toggleItemDone(id: string) {
     .update({ done: !data.done })
     .eq("id", id);
   if (error) console.error("Failed to toggle item:", error);
+}
+
+export async function updateItem(id: string, updates: Record<string, any>) {
+  const { error } = await supabase.from("items").update(updates).eq("id", id);
+  if (error) console.error("Failed to update item:", error);
+}
+
+export async function deleteItem(id: string) {
+  const { error } = await supabase.from("items").delete().eq("id", id);
+  if (error) console.error("Failed to delete item:", error);
 }
 
 export async function clearHistory() {
@@ -104,5 +113,18 @@ export function saveSettings(s: AppSettings) {
 
 export function getAllFolders(): FolderDef[] {
   const settings = getSettings();
-  return [...DEFAULT_FOLDERS, ...settings.customFolders];
+  // Merge: use settings overrides for default folder colors/emojis
+  const defaults = DEFAULT_FOLDERS.map((df) => {
+    const override = settings.customFolders.find((f) => f.key === df.key);
+    return override ? { ...df, ...override } : df;
+  });
+  const customKeys = new Set(DEFAULT_FOLDERS.map((f) => f.key));
+  const custom = settings.customFolders.filter((f) => !customKeys.has(f.key));
+  return [...defaults, ...custom];
+}
+
+export function getFolderColor(folderKey: string): string {
+  const folders = getAllFolders();
+  const folder = folders.find((f) => f.key === folderKey);
+  return folder?.color || "#6366f1";
 }
