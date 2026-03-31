@@ -40,6 +40,7 @@ export interface ExtractedItem {
 
 export interface SavedItem extends ExtractedItem {
   savedAt: string;
+  done?: boolean;
 }
 
 export interface AppSettings {
