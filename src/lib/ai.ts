@@ -21,15 +21,20 @@ For each item return a JSON object with:
 Return a JSON array of items. Only return the JSON array, nothing else.`;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [
-          { role: "user", parts: [{ text: `${systemPrompt}\n\n---\n\nTranscript:\n${transcript}` }] },
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: transcript },
         ],
-        generationConfig: { temperature: 0.3 },
+        temperature: 0.3,
       }),
     }
   );
@@ -40,7 +45,7 @@ Return a JSON array of items. Only return the JSON array, nothing else.`;
   }
 
   const data = await response.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+  const raw = data.choices?.[0]?.message?.content || "[]";
 
   let jsonStr = raw.trim();
   if (jsonStr.startsWith("```")) {
