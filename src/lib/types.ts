@@ -10,21 +10,33 @@ export type FolderKey =
   | "ideas"
   | "personal";
 
+export const FOLDER_COLORS = [
+  "#6366f1", // indigo
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#ef4444", // red
+  "#f97316", // orange
+  "#eab308", // yellow
+  "#22c55e", // green
+  "#06b6d4", // cyan
+] as const;
+
 export interface FolderDef {
   key: string;
   label: string;
   emoji: string;
+  color?: string;
 }
 
 export const DEFAULT_FOLDERS: FolderDef[] = [
-  { key: "calendar", label: "Calendar", emoji: "📅" },
-  { key: "tasks", label: "Tasks", emoji: "✅" },
-  { key: "notes", label: "Notes", emoji: "📝" },
-  { key: "reminders", label: "Reminders", emoji: "⏰" },
-  { key: "business", label: "Business", emoji: "💼" },
-  { key: "marketing", label: "Marketing", emoji: "📢" },
-  { key: "ideas", label: "Ideas", emoji: "💡" },
-  { key: "personal", label: "Personal", emoji: "👤" },
+  { key: "calendar", label: "Calendar", emoji: "📅", color: "#06b6d4" },
+  { key: "tasks", label: "Tasks", emoji: "✅", color: "#22c55e" },
+  { key: "notes", label: "Notes", emoji: "📝", color: "#eab308" },
+  { key: "reminders", label: "Reminders", emoji: "⏰", color: "#f97316" },
+  { key: "business", label: "Business", emoji: "💼", color: "#6366f1" },
+  { key: "marketing", label: "Marketing", emoji: "📢", color: "#ec4899" },
+  { key: "ideas", label: "Ideas", emoji: "💡", color: "#8b5cf6" },
+  { key: "personal", label: "Personal", emoji: "👤", color: "#ef4444" },
 ];
 
 export interface ExtractedItem {
