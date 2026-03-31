@@ -47,18 +47,18 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* API Key */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">OpenRouter API Key</label>
+          <label className="text-sm font-medium text-foreground">Google Gemini API Key</label>
           <Input
             type="password"
             value={settings.apiKey}
             onChange={(e) => save({ ...settings, apiKey: e.target.value })}
-            placeholder="sk-or-..."
+            placeholder="AIza..."
             className="bg-secondary/50 border-border text-foreground"
           />
           <p className="text-xs text-muted-foreground">
             Get your key at{" "}
-            <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-accent underline">
-              openrouter.ai/keys
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-accent underline">
+              aistudio.google.com/apikey
             </a>
           </p>
         </div>
