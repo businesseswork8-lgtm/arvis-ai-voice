@@ -33,7 +33,7 @@ export default function Index() {
         }
         const settings = getSettings();
         if (!settings.apiKey) {
-          toast.error("Please add your OpenRouter API key in Settings.");
+          toast.error("Please add your Gemini API key in Settings.");
           return;
         }
         setIsProcessing(true);
