@@ -74,11 +74,11 @@ export default function Index() {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
   };
 
-  const confirmItem = (id: string) => {
+  const confirmItem = async (id: string) => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
     const saved: SavedItem = { ...item, confirmed: true, savedAt: new Date().toISOString() };
-    saveItems([saved]);
+    await saveItems([saved]);
     setItems((prev) => prev.filter((i) => i.id !== id));
     toast.success(`Saved: ${item.title}`);
   };
@@ -87,13 +87,13 @@ export default function Index() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
-  const confirmAll = () => {
+  const confirmAll = async () => {
     const saved: SavedItem[] = items.map((i) => ({
       ...i,
       confirmed: true,
       savedAt: new Date().toISOString(),
     }));
-    saveItems(saved);
+    await saveItems(saved);
     setItems([]);
     toast.success(`Saved ${saved.length} items`);
   };
