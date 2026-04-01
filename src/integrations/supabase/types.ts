@@ -21,6 +21,8 @@ export type Database = {
           created_at: string
           datetime: string | null
           done: boolean
+          end_datetime: string | null
+          event_color: string | null
           folder: string | null
           id: string
           sync_key: string
@@ -34,6 +36,8 @@ export type Database = {
           created_at?: string
           datetime?: string | null
           done?: boolean
+          end_datetime?: string | null
+          event_color?: string | null
           folder?: string | null
           id?: string
           sync_key: string
@@ -47,6 +51,8 @@ export type Database = {
           created_at?: string
           datetime?: string | null
           done?: boolean
+          end_datetime?: string | null
+          event_color?: string | null
           folder?: string | null
           id?: string
           sync_key?: string
