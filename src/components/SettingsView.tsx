@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { getSettings, saveSettings, clearHistory, getSyncKey, setSyncKey } from "@/lib/storage";
+import { FolderManager } from "@/components/FolderManager";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Copy, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2, Copy, RefreshCw, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 interface SettingsViewProps {
@@ -14,6 +15,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [syncKey, setSyncKeyState] = useState(getSyncKey);
   const [editSyncKey, setEditSyncKey] = useState("");
   const [showEditSync, setShowEditSync] = useState(false);
+  const [showFolderManager, setShowFolderManager] = useState(false);
+  const [, forceUpdate] = useState(0);
 
   const save = (updated: typeof settings) => {
     setSettings(updated);
@@ -83,6 +86,18 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           )}
         </div>
 
+        {/* Folder Management */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">Note Folders</label>
+          <p className="text-xs text-muted-foreground">
+            Manage folders for organizing your notes.
+          </p>
+          <Button variant="outline" onClick={() => setShowFolderManager(true)} className="w-full">
+            <FolderOpen className="w-4 h-4 mr-2" />
+            Manage Folders
+          </Button>
+        </div>
+
         {/* API Key */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Google Gemini API Key</label>
@@ -111,6 +126,12 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </Button>
         </div>
       </div>
+
+      <FolderManager
+        open={showFolderManager}
+        onOpenChange={setShowFolderManager}
+        onFoldersChanged={() => forceUpdate((n) => n + 1)}
+      />
     </div>
   );
 }

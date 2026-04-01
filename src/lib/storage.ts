@@ -41,6 +41,8 @@ export async function getHistory(): Promise<SavedItem[]> {
     title: row.title,
     content: row.content || "",
     datetime: row.datetime || undefined,
+    end_datetime: row.end_datetime || undefined,
+    event_color: row.event_color || undefined,
     confirmed: row.confirmed,
     dismissed: false,
     savedAt: row.created_at,
@@ -54,10 +56,12 @@ export async function saveItems(items: SavedItem[]) {
     id: item.id,
     sync_key: syncKey,
     type: item.type,
-    folder: item.folder || null,
+    folder: item.type === "Note" ? (item.folder || null) : null,
     title: item.title,
     content: item.content || "",
     datetime: item.datetime || null,
+    end_datetime: item.end_datetime || null,
+    event_color: item.event_color || null,
     done: item.done || false,
     confirmed: true,
   }));
@@ -113,13 +117,15 @@ export function saveSettings(s: AppSettings) {
 
 export function getAllFolders(): FolderDef[] {
   const settings = getSettings();
-  // Merge: use settings overrides for default folder colors/emojis
-  const defaults = DEFAULT_FOLDERS.map((df) => {
-    const override = settings.customFolders.find((f) => f.key === df.key);
-    return override ? { ...df, ...override } : df;
-  });
+  const deletedFolders: string[] = JSON.parse(localStorage.getItem("declutter_deleted_folders") || "[]");
+  const defaults = DEFAULT_FOLDERS
+    .filter((df) => !deletedFolders.includes(df.key))
+    .map((df) => {
+      const override = settings.customFolders.find((f) => f.key === df.key);
+      return override ? { ...df, ...override } : df;
+    });
   const customKeys = new Set(DEFAULT_FOLDERS.map((f) => f.key));
-  const custom = settings.customFolders.filter((f) => !customKeys.has(f.key));
+  const custom = settings.customFolders.filter((f) => !customKeys.has(f.key) && !deletedFolders.includes(f.key));
   return [...defaults, ...custom];
 }
 
@@ -127,4 +133,27 @@ export function getFolderColor(folderKey: string): string {
   const folders = getAllFolders();
   const folder = folders.find((f) => f.key === folderKey);
   return folder?.color || "#6366f1";
+}
+
+// ─── Recent notes per folder (for AI context) ────────────
+export async function getRecentNotesByFolder(): Promise<Record<string, string[]>> {
+  const syncKey = getSyncKey();
+  const { data, error } = await supabase
+    .from("items")
+    .select("folder, title")
+    .eq("sync_key", syncKey)
+    .eq("type", "Note")
+    .eq("confirmed", true)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error || !data) return {};
+
+  const result: Record<string, string[]> = {};
+  for (const row of data) {
+    const folder = row.folder || "personal";
+    if (!result[folder]) result[folder] = [];
+    if (result[folder].length < 10) result[folder].push(row.title);
+  }
+  return result;
 }

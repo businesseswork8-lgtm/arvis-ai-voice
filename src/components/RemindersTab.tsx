@@ -1,15 +1,22 @@
 import { useState, useMemo, useCallback } from "react";
-import { format, parseISO, isToday, isBefore, startOfDay, isAfter } from "date-fns";
+import { format, parseISO, isToday, isBefore, startOfDay } from "date-fns";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
-import { toggleItemDone, getFolderColor } from "@/lib/storage";
+import { toggleItemDone, saveItems } from "@/lib/storage";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Check, ChevronDown, ChevronRight, Undo2 } from "lucide-react";
+import { Bell, Check, Undo2, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { SavedItem } from "@/lib/types";
+import { toast } from "sonner";
 
 type ReminderFilter = "active" | "completed";
 
 export function RemindersTab() {
   const { items: history, loading, refresh } = useSyncedItems();
   const [filter, setFilter] = useState<ReminderFilter>("active");
+  const [showForm, setShowForm] = useState(false);
+  const [newReminder, setNewReminder] = useState({ title: "", date: "", time: "" });
   const now = new Date();
   const todayStart = startOfDay(now);
 
@@ -39,6 +46,28 @@ export function RemindersTab() {
     await toggleItemDone(id);
     refresh();
   }, [refresh]);
+
+  const handleCreate = async () => {
+    if (!newReminder.title.trim() || !newReminder.date || !newReminder.time) return;
+    const datetime = `${newReminder.date}T${newReminder.time}:00`;
+    const item: SavedItem = {
+      id: crypto.randomUUID(),
+      type: "Reminder",
+      folder: "",
+      title: newReminder.title.trim(),
+      content: "",
+      datetime,
+      confirmed: true,
+      dismissed: false,
+      savedAt: new Date().toISOString(),
+      done: false,
+    };
+    await saveItems([item]);
+    toast.success("Reminder created");
+    setShowForm(false);
+    setNewReminder({ title: "", date: "", time: "" });
+    refresh();
+  };
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
@@ -99,6 +128,33 @@ export function RemindersTab() {
           ))}
         </div>
       )}
+
+      {/* FAB */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setShowForm(true)}
+        className="fixed bottom-36 right-4 z-40 w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
+      >
+        <Plus className="w-5 h-5 text-primary-foreground" />
+      </motion.button>
+
+      {/* New Reminder Dialog */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="bg-card border-border max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">New Reminder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input value={newReminder.title} onChange={(e) => setNewReminder((p) => ({ ...p, title: e.target.value }))}
+              placeholder="Reminder title" className="bg-secondary/50 border-border text-foreground" />
+            <Input type="date" value={newReminder.date} onChange={(e) => setNewReminder((p) => ({ ...p, date: e.target.value }))}
+              className="bg-secondary/50 border-border text-foreground" />
+            <Input type="time" value={newReminder.time} onChange={(e) => setNewReminder((p) => ({ ...p, time: e.target.value }))}
+              className="bg-secondary/50 border-border text-foreground" />
+            <Button onClick={handleCreate} className="w-full">Create Reminder</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -118,35 +174,32 @@ function ReminderGroup({
         {title} ({items.length})
       </h3>
       <AnimatePresence>
-        {items.map((r) => {
-          const folderColor = getFolderColor(r.folder);
-          return (
-            <motion.div
-              key={r.id}
-              layout
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 100 }}
-              className="bg-card rounded-xl border border-border p-3 flex items-center gap-3"
+        {items.map((r) => (
+          <motion.div
+            key={r.id}
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            className="bg-card rounded-xl border border-border p-3 flex items-center gap-3"
+          >
+            <Bell className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
+              {r.datetime && (
+                <p className={`text-xs mt-0.5 ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
+                  {format(parseISO(r.datetime), "MMM d, h:mm a")}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => onToggle(r.id)}
+              className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center hover:bg-primary/20 transition-colors flex-shrink-0"
             >
-              <Bell className="w-4 h-4 flex-shrink-0" style={{ color: folderColor }} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
-                {r.datetime && (
-                  <p className={`text-xs mt-0.5 ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
-                    {format(parseISO(r.datetime), "MMM d, h:mm a")}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => onToggle(r.id)}
-                className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center hover:bg-primary/20 transition-colors flex-shrink-0"
-              >
-                <Check className="w-4 h-4 text-primary" />
-              </button>
-            </motion.div>
-          );
-        })}
+              <Check className="w-4 h-4 text-primary" />
+            </button>
+          </motion.div>
+        ))}
       </AnimatePresence>
     </div>
   );
