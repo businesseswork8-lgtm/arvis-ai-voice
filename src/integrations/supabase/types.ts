@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      google_calendar_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          google_email: string | null
+          id: string
+          refresh_token: string
+          sync_key: string
+          token_expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          google_email?: string | null
+          id?: string
+          refresh_token: string
+          sync_key: string
+          token_expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          google_email?: string | null
+          id?: string
+          refresh_token?: string
+          sync_key?: string
+          token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       items: {
         Row: {
           confirmed: boolean
@@ -21,7 +54,10 @@ export type Database = {
           created_at: string
           datetime: string | null
           done: boolean
+          end_datetime: string | null
+          event_color: string | null
           folder: string | null
+          google_calendar_event_id: string | null
           id: string
           sync_key: string
           title: string
@@ -34,7 +70,10 @@ export type Database = {
           created_at?: string
           datetime?: string | null
           done?: boolean
+          end_datetime?: string | null
+          event_color?: string | null
           folder?: string | null
+          google_calendar_event_id?: string | null
           id?: string
           sync_key: string
           title: string
@@ -47,7 +86,10 @@ export type Database = {
           created_at?: string
           datetime?: string | null
           done?: boolean
+          end_datetime?: string | null
+          event_color?: string | null
           folder?: string | null
+          google_calendar_event_id?: string | null
           id?: string
           sync_key?: string
           title?: string

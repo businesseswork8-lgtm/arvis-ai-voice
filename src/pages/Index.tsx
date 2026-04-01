@@ -3,7 +3,6 @@ import { BottomNav, TabKey } from "@/components/BottomNav";
 import { HomeTab } from "@/components/HomeTab";
 import { CalendarTab } from "@/components/CalendarTab";
 import { TasksTab } from "@/components/TasksTab";
-import { FoldersTab } from "@/components/FoldersTab";
 import { RemindersTab } from "@/components/RemindersTab";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { ExtractedCard } from "@/components/ExtractedCard";
@@ -130,7 +129,6 @@ export default function Index() {
         {tab === "calendar" && <CalendarTab />}
         {tab === "tasks" && <TasksTab />}
         {tab === "reminders" && <RemindersTab />}
-        {tab === "folders" && <FoldersTab />}
       </div>
 
       <motion.button whileTap={{ scale: 0.9 }} onClick={handleMicPress}

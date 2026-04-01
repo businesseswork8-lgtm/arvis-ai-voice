@@ -1,20 +1,23 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
-  isSameMonth, startOfWeek, endOfWeek, parseISO, addDays, startOfDay,
-  setHours, setMinutes, eachHourOfInterval, isSameHour,
+  isSameMonth, startOfWeek, endOfWeek, parseISO, addDays,
+  setHours,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, X, Trash2, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
-import { getFolderColor, getAllFolders, saveItems, updateItem, deleteItem, getSyncKey } from "@/lib/storage";
-import { SavedItem } from "@/lib/types";
+import { saveItems, updateItem, deleteItem } from "@/lib/storage";
+import { SavedItem, EVENT_COLORS } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 
 type CalView = "M" | "W" | "D";
+
+const DEFAULT_EVENT_COLOR = "#6366f1";
 
 export function CalendarTab() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -24,13 +27,14 @@ export function CalendarTab() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SavedItem | null>(null);
   const [editingEvent, setEditingEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", content: "", date: "", startTime: "09:00", endTime: "10:00", folder: "calendar" });
+  const [newEvent, setNewEvent] = useState({
+    title: "", content: "", date: "", startTime: "09:00", endTime: "10:00", color: DEFAULT_EVENT_COLOR,
+  });
   const { items: history, loading, refresh } = useSyncedItems();
 
   const events = useMemo(() => history.filter((i) => i.type === "Calendar Event" && i.datetime), [history]);
-  const folders = getAllFolders();
-  const deletedFolders = JSON.parse(localStorage.getItem("declutter_deleted_folders") || "[]");
-  const visibleFolders = folders.filter((f) => !deletedFolders.includes(f.key));
+
+  const getEventColor = (event: SavedItem) => event.event_color || DEFAULT_EVENT_COLOR;
 
   const openNewEvent = (date?: Date, hour?: number) => {
     const d = date || selectedDate;
@@ -40,7 +44,7 @@ export function CalendarTab() {
       date: format(d, "yyyy-MM-dd"),
       startTime: `${String(h).padStart(2, "0")}:00`,
       endTime: `${String(Math.min(h + 1, 23)).padStart(2, "0")}:00`,
-      folder: "calendar",
+      color: DEFAULT_EVENT_COLOR,
     });
     setEditingEvent(false);
     setShowEventModal(true);
@@ -49,13 +53,14 @@ export function CalendarTab() {
   const openEditEvent = () => {
     if (!selectedEvent) return;
     const dt = selectedEvent.datetime ? parseISO(selectedEvent.datetime) : new Date();
+    const endDt = selectedEvent.end_datetime ? parseISO(selectedEvent.end_datetime) : new Date(dt.getTime() + 3600000);
     setNewEvent({
       title: selectedEvent.title,
       content: selectedEvent.content,
       date: format(dt, "yyyy-MM-dd"),
       startTime: format(dt, "HH:mm"),
-      endTime: format(new Date(dt.getTime() + 3600000), "HH:mm"),
-      folder: selectedEvent.folder || "calendar",
+      endTime: format(endDt, "HH:mm"),
+      color: selectedEvent.event_color || DEFAULT_EVENT_COLOR,
     });
     setEditingEvent(true);
     setShowDetailModal(false);
@@ -65,23 +70,27 @@ export function CalendarTab() {
   const handleSaveEvent = async () => {
     if (!newEvent.title.trim()) return;
     const datetime = `${newEvent.date}T${newEvent.startTime}:00`;
+    const end_datetime = `${newEvent.date}T${newEvent.endTime}:00`;
 
     if (editingEvent && selectedEvent) {
       await updateItem(selectedEvent.id, {
         title: newEvent.title.trim(),
         content: newEvent.content,
         datetime,
-        folder: newEvent.folder,
+        end_datetime,
+        event_color: newEvent.color,
       });
       toast.success("Event updated");
     } else {
       const item: SavedItem = {
         id: crypto.randomUUID(),
         type: "Calendar Event",
-        folder: newEvent.folder,
+        folder: "",
         title: newEvent.title.trim(),
         content: newEvent.content,
         datetime,
+        end_datetime,
+        event_color: newEvent.color,
         confirmed: true,
         dismissed: false,
         savedAt: new Date().toISOString(),
@@ -142,7 +151,16 @@ export function CalendarTab() {
       {view === "W" && <WeekView />}
       {view === "D" && <DayView />}
 
-      {/* New Event Modal */}
+      {/* FAB */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={() => openNewEvent()}
+        className="fixed bottom-36 right-4 z-40 w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
+      >
+        <Plus className="w-5 h-5 text-primary-foreground" />
+      </motion.button>
+
+      {/* New/Edit Event Modal */}
       <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
         <DialogContent className="bg-card border-border max-w-sm mx-auto">
           <DialogHeader>
@@ -163,22 +181,16 @@ export function CalendarTab() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Folder</label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {visibleFolders.map((f) => (
+              <label className="text-xs text-muted-foreground">Color</label>
+              <div className="flex gap-2 mt-1">
+                {EVENT_COLORS.map((c) => (
                   <button
-                    key={f.key}
-                    onClick={() => setNewEvent((p) => ({ ...p, folder: f.key }))}
-                    className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
-                      newEvent.folder === f.key ? "ring-2 ring-offset-1 ring-offset-background" : "opacity-60 hover:opacity-100"
-                    }`}
-                    style={{
-                      backgroundColor: `${f.color || "#6366f1"}20`,
-                      color: f.color || "#6366f1",
-                      ...(newEvent.folder === f.key ? { ringColor: f.color } : {}),
-                    }}
+                    key={c}
+                    onClick={() => setNewEvent((p) => ({ ...p, color: c }))}
+                    className="w-8 h-8 rounded-full transition-transform hover:scale-110 flex items-center justify-center"
+                    style={{ backgroundColor: c }}
                   >
-                    {f.emoji} {f.label}
+                    {newEvent.color === c && <Check className="w-4 h-4 text-white" />}
                   </button>
                 ))}
               </div>
@@ -201,14 +213,7 @@ export function CalendarTab() {
                 {selectedEvent.datetime && (
                   <p className="text-sm text-foreground">{format(parseISO(selectedEvent.datetime), "EEEE, MMM d · h:mm a")}</p>
                 )}
-                {selectedEvent.folder && (
-                  <span
-                    className="inline-flex text-xs px-2.5 py-1 rounded-full font-medium"
-                    style={{ backgroundColor: `${getFolderColor(selectedEvent.folder)}20`, color: getFolderColor(selectedEvent.folder) }}
-                  >
-                    {selectedEvent.folder}
-                  </span>
-                )}
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: getEventColor(selectedEvent) }} />
                 <div className="flex gap-2 pt-2">
                   <Button onClick={openEditEvent} variant="outline" className="flex-1">
                     <Pencil className="w-4 h-4 mr-1" /> Edit
@@ -274,7 +279,7 @@ export function CalendarTab() {
                 {dayEvents.length > 0 && !isSelected && (
                   <div className="absolute bottom-1 flex gap-0.5">
                     {dayEvents.slice(0, 3).map((e, i) => (
-                      <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: getFolderColor(e.folder) }} />
+                      <div key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: getEventColor(e) }} />
                     ))}
                   </div>
                 )}
@@ -283,7 +288,6 @@ export function CalendarTab() {
           })}
         </div>
 
-        {/* Day events */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-muted-foreground">{format(selectedDate, "EEEE, MMM d")}</h3>
@@ -301,10 +305,10 @@ export function CalendarTab() {
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => { setSelectedEvent(item); setShowDetailModal(true); }}
                 className="w-full text-left rounded-xl border border-border p-3"
-                style={{ backgroundColor: `${getFolderColor(item.folder)}10`, borderColor: `${getFolderColor(item.folder)}30` }}
+                style={{ backgroundColor: `${getEventColor(item)}10`, borderColor: `${getEventColor(item)}30` }}
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-1 h-8 rounded-full" style={{ backgroundColor: getFolderColor(item.folder) }} />
+                  <div className="w-1 h-8 rounded-full" style={{ backgroundColor: getEventColor(item) }} />
                   <div>
                     <p className="text-sm font-medium text-foreground">{item.title}</p>
                     {item.datetime && <p className="text-xs text-muted-foreground">{format(parseISO(item.datetime), "h:mm a")}</p>}
@@ -321,11 +325,10 @@ export function CalendarTab() {
   function WeekView() {
     const weekStart = startOfWeek(currentDate);
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-    const hours = Array.from({ length: 18 }, (_, i) => i + 6); // 6am-11pm
+    const hours = Array.from({ length: 18 }, (_, i) => i + 6);
 
     return (
       <div className="overflow-x-auto">
-        {/* Day headers */}
         <div className="grid grid-cols-[50px_repeat(7,1fr)] sticky top-0 bg-background z-10 border-b border-border">
           <div />
           {weekDays.map((d) => (
@@ -338,7 +341,6 @@ export function CalendarTab() {
           ))}
         </div>
 
-        {/* Time grid */}
         <div className="relative" style={{ height: `${hours.length * 48}px` }}>
           {hours.map((h) => (
             <div key={h} className="grid grid-cols-[50px_repeat(7,1fr)] absolute w-full border-b border-border/30" style={{ top: `${(h - 6) * 48}px`, height: "48px" }}>
@@ -353,7 +355,6 @@ export function CalendarTab() {
             </div>
           ))}
 
-          {/* Events */}
           {events.map((event) => {
             const dt = parseISO(event.datetime!);
             const dayIdx = weekDays.findIndex((d) => isSameDay(d, dt));
@@ -371,7 +372,7 @@ export function CalendarTab() {
                 className="absolute rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white truncate z-10"
                 style={{
                   top: `${top}px`, left, width: colWidth, height: "46px",
-                  backgroundColor: getFolderColor(event.folder),
+                  backgroundColor: getEventColor(event),
                 }}
               >
                 {event.title}
@@ -399,11 +400,10 @@ export function CalendarTab() {
             <div className="w-14 text-[10px] text-muted-foreground text-right pr-2 pt-1 flex-shrink-0">
               {format(setHours(new Date(), h), "h a")}
             </div>
-            <div className="flex-1 border-l border-border/20" />
+            <div className="flex-1 relative" />
           </button>
         ))}
 
-        {/* Events */}
         {dayEvents.map((event) => {
           const dt = parseISO(event.datetime!);
           const hour = dt.getHours();
@@ -414,11 +414,11 @@ export function CalendarTab() {
             <button
               key={event.id}
               onClick={() => { setSelectedEvent(event); setShowDetailModal(true); }}
-              className="absolute left-14 right-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white truncate z-10"
-              style={{ top: `${top}px`, height: "54px", backgroundColor: getFolderColor(event.folder) }}
+              className="absolute left-14 right-2 rounded-lg px-3 py-1.5 text-white text-sm font-medium z-10"
+              style={{ top: `${top}px`, height: "54px", backgroundColor: getEventColor(event) }}
             >
-              <div>{event.title}</div>
-              <div className="text-[10px] opacity-80">{format(dt, "h:mm a")}</div>
+              <p className="truncate">{event.title}</p>
+              <p className="text-xs text-white/80">{format(dt, "h:mm a")}</p>
             </button>
           );
         })}

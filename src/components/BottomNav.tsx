@@ -1,6 +1,6 @@
-import { Home, CalendarDays, ListTodo, FolderOpen, Bell } from "lucide-react";
+import { Home, CalendarDays, ListTodo, Bell } from "lucide-react";
 
-export type TabKey = "home" | "calendar" | "tasks" | "folders" | "reminders";
+export type TabKey = "home" | "calendar" | "tasks" | "reminders";
 
 interface BottomNavProps {
   active: TabKey;
@@ -12,7 +12,6 @@ const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "calendar", label: "Calendar", icon: <CalendarDays className="w-5 h-5" /> },
   { key: "tasks", label: "Tasks", icon: <ListTodo className="w-5 h-5" /> },
   { key: "reminders", label: "Reminders", icon: <Bell className="w-5 h-5" /> },
-  { key: "folders", label: "Folders", icon: <FolderOpen className="w-5 h-5" /> },
 ];
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
