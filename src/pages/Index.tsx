@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { BottomNav, TabKey } from "@/components/BottomNav";
 import { HomeTab } from "@/components/HomeTab";
 import { CalendarTab } from "@/components/CalendarTab";
@@ -9,8 +9,9 @@ import { ExtractedCard } from "@/components/ExtractedCard";
 import { SettingsView } from "@/components/SettingsView";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { extractItems } from "@/lib/ai";
-import { getSettings, saveItems } from "@/lib/storage";
+import { getSettings, saveItems, updateItem } from "@/lib/storage";
 import { ExtractedItem, SavedItem } from "@/lib/types";
+import { exchangeGCalCode, createGCalEvent, getGCalConnection } from "@/lib/gcal";
 import { Mic, Settings, CheckCheck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -26,6 +27,25 @@ export default function Index() {
     isRecording, interimTranscript, finalTranscript, fullTranscript,
     startRecording, stopRecording, cancelRecording, resetTranscript,
   } = useVoiceRecording();
+
+  // Handle Google Calendar OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      // Clear the URL
+      window.history.replaceState({}, "", "/");
+      exchangeGCalCode(code).then((result) => {
+        if (result.error) {
+          toast.error("Failed to connect Google Calendar");
+        } else {
+          toast.success(`Google Calendar connected: ${result.email}`);
+        }
+      }).catch(() => {
+        toast.error("Failed to connect Google Calendar");
+      });
+    }
+  }, []);
 
   const handleMicPress = () => {
     setShowRecording(true);
@@ -64,8 +84,46 @@ export default function Index() {
     }
   }, [fullTranscript, stopRecording, resetTranscript]);
 
-  const updateItem = (id: string, updates: Partial<ExtractedItem>) => {
+  const updateItemState = (id: string, updates: Partial<ExtractedItem>) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
+  };
+
+  const syncToGCal = async (item: SavedItem) => {
+    try {
+      const conn = await getGCalConnection();
+      if (!conn) return;
+
+      if (item.type === "Calendar Event" && item.datetime) {
+        const gcalId = await createGCalEvent({
+          title: item.title,
+          description: item.content,
+          start_datetime: item.datetime,
+          end_datetime: item.end_datetime,
+        });
+        if (gcalId) {
+          await updateItem(item.id, { google_calendar_event_id: gcalId });
+        }
+      } else if (item.type === "Task" && item.datetime) {
+        const gcalId = await createGCalEvent({
+          title: `📋 ${item.title}`,
+          description: item.content,
+          start_datetime: item.datetime,
+        });
+        if (gcalId) {
+          await updateItem(item.id, { google_calendar_event_id: gcalId });
+        }
+      } else if (item.type === "Reminder" && item.datetime) {
+        const gcalId = await createGCalEvent({
+          title: `⏰ ${item.title}`,
+          start_datetime: item.datetime,
+        });
+        if (gcalId) {
+          await updateItem(item.id, { google_calendar_event_id: gcalId });
+        }
+      }
+    } catch {
+      // Silently fail GCal sync - don't block the main flow
+    }
   };
 
   const confirmItem = async (id: string) => {
@@ -75,6 +133,8 @@ export default function Index() {
     await saveItems([saved]);
     setItems((prev) => prev.filter((i) => i.id !== id));
     toast.success(`Saved: ${item.title}`);
+    // Sync to Google Calendar in background
+    syncToGCal(saved);
   };
 
   const dismissItem = (id: string) => {
@@ -88,6 +148,8 @@ export default function Index() {
     await saveItems(saved);
     setItems([]);
     toast.success(`Saved ${saved.length} items`);
+    // Sync each to GCal in background
+    saved.forEach((s) => syncToGCal(s));
   };
 
   if (showSettings) return <SettingsView onBack={() => setShowSettings(false)} />;
@@ -116,7 +178,7 @@ export default function Index() {
               </div>
               <AnimatePresence>
                 {activeItems.map((item, i) => (
-                  <ExtractedCard key={item.id} item={item} index={i} onUpdate={updateItem} onConfirm={confirmItem} onDismiss={dismissItem} />
+                  <ExtractedCard key={item.id} item={item} index={i} onUpdate={updateItemState} onConfirm={confirmItem} onDismiss={dismissItem} />
                 ))}
               </AnimatePresence>
             </div>
