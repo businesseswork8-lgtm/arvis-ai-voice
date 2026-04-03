@@ -1,23 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getSyncKey } from "./storage";
 
-const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-const callFunction = async (name: string, body: object) => {
-  const res = await fetch(`${FUNCTIONS_URL}/${name}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${ANON_KEY}`,
-      "apikey": ANON_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Function error: ${res.status}`);
-  return res.json();
-};
-
 export async function getGCalConnection() {
   const syncKey = getSyncKey();
   const { data } = await supabase
@@ -31,45 +14,47 @@ export async function getGCalConnection() {
 export async function startGCalAuth() {
   const syncKey = getSyncKey();
   const redirectUri = `${window.location.origin}/`;
-  const data = await callFunction("google-calendar-auth", {
-    action: "get_auth_url",
-    sync_key: syncKey,
-    redirect_uri: redirectUri,
+
+  const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
+    body: {
+      action: "get_auth_url",
+      sync_key: syncKey,
+      redirect_uri: redirectUri,
+    },
   });
+
+  if (error) throw new Error(error.message || "Failed to start auth");
   if (data?.url) {
     window.location.href = data.url;
   } else {
-    throw new Error(data?.error || "Failed to get auth URL");
+    throw new Error(data?.error || "No URL returned from auth function");
   }
 }
 
 export async function exchangeGCalCode(code: string) {
   const syncKey = getSyncKey();
   const redirectUri = `${window.location.origin}/`;
-  return callFunction("google-calendar-auth", {
-    action: "exchange_code",
-    code,
-    sync_key: syncKey,
-    redirect_uri: redirectUri,
+  const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
+    body: { action: "exchange_code", code, sync_key: syncKey, redirect_uri: redirectUri },
   });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function disconnectGCal() {
   const syncKey = getSyncKey();
-  await callFunction("google-calendar-auth", {
-    action: "disconnect",
-    sync_key: syncKey,
+  await supabase.functions.invoke("google-calendar-auth", {
+    body: { action: "disconnect", sync_key: syncKey },
   });
 }
 
 export async function fetchGCalEvents() {
   const syncKey = getSyncKey();
-  const data = await callFunction("google-calendar-sync", {
-    action: "list_events",
-    sync_key: syncKey,
+  const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
+    body: { action: "list_events", sync_key: syncKey },
   });
-  if (data.error) throw new Error(data.error);
-  return data.events || [];
+  if (error) throw new Error(error.message);
+  return data?.events || [];
 }
 
 export async function createGCalEvent(event: {
@@ -80,13 +65,11 @@ export async function createGCalEvent(event: {
 }) {
   const syncKey = getSyncKey();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const data = await callFunction("google-calendar-sync", {
-    action: "create_event",
-    sync_key: syncKey,
-    event: { ...event, timezone: tz },
+  const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
+    body: { action: "create_event", sync_key: syncKey, event: { ...event, timezone: tz } },
   });
-  if (data.error) throw new Error(data.error);
-  return data.google_event_id;
+  if (error) throw new Error(error.message);
+  return data?.google_event_id;
 }
 
 export async function updateGCalEvent(event: {
@@ -98,20 +81,16 @@ export async function updateGCalEvent(event: {
 }) {
   const syncKey = getSyncKey();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const data = await callFunction("google-calendar-sync", {
-    action: "update_event",
-    sync_key: syncKey,
-    event: { ...event, timezone: tz },
+  const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
+    body: { action: "update_event", sync_key: syncKey, event: { ...event, timezone: tz } },
   });
-  if (data.error) throw new Error(data.error);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteGCalEvent(googleEventId: string) {
   const syncKey = getSyncKey();
-  const data = await callFunction("google-calendar-sync", {
-    action: "delete_event",
-    sync_key: syncKey,
-    event: { google_event_id: googleEventId },
+  const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
+    body: { action: "delete_event", sync_key: syncKey, event: { google_event_id: googleEventId } },
   });
-  if (data.error) throw new Error(data.error);
+  if (error) throw new Error(error.message);
 }
