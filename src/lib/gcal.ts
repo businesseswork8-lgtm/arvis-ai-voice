@@ -107,7 +107,7 @@ export async function syncGCalToLocal(): Promise<number> {
     const rows = events
       .filter((e: any) => e.start?.dateTime || e.start?.date)
       .map((e: any) => ({
-        id: `gcal_${e.id}`,
+        id: crypto.randomUUID(), // proper UUID — dedup is handled via google_calendar_event_id
         sync_key: syncKey,
         type: "Calendar Event",
         folder: null,
@@ -116,11 +116,15 @@ export async function syncGCalToLocal(): Promise<number> {
         datetime: e.start?.dateTime || `${e.start?.date}T00:00:00`,
         end_datetime: e.end?.dateTime || null,
         event_color: "#4285f4",
+        google_calendar_event_id: e.id, // used for deduplication via unique index
         done: false,
         confirmed: true,
       }));
 
-    const { error } = await supabase.from("items").upsert(rows, { onConflict: "id" });
+    const { error } = await supabase
+      .from("items")
+      .upsert(rows, { onConflict: "google_calendar_event_id" });
+
     if (error) console.error("Failed to sync GCal events:", error);
     return rows.length;
   } catch (e) {
