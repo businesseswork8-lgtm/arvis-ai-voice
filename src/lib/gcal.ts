@@ -96,11 +96,10 @@ export async function deleteGCalEvent(googleEventId: string) {
 }
 
 // Pulls events from Google Calendar and upserts them into Supabase items table
+// Note: skips getGCalConnection() pre-check since anon client may be blocked by RLS
+// The edge function handles auth validation using service role key
 export async function syncGCalToLocal(): Promise<number> {
   try {
-    const conn = await getGCalConnection();
-    if (!conn) return 0;
-
     const events = await fetchGCalEvents();
     if (!events.length) return 0;
 
