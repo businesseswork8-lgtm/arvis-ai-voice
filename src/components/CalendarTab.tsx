@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
   isSameMonth, startOfWeek, endOfWeek, parseISO, addDays,
@@ -6,6 +6,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
+import { syncGCalToLocal } from "@/lib/gcal";
 import { saveItems, updateItem, deleteItem } from "@/lib/storage";
 import { SavedItem, EVENT_COLORS } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,6 +32,13 @@ export function CalendarTab() {
     title: "", content: "", date: "", startTime: "09:00", endTime: "10:00", color: DEFAULT_EVENT_COLOR,
   });
   const { items: history, loading, refresh } = useSyncedItems();
+
+  // Sync Google Calendar events on mount
+  useEffect(() => {
+    syncGCalToLocal().then((count) => {
+      if (count > 0) refresh();
+    });
+  }, []);
 
   const events = useMemo(() => history.filter((i) => i.type === "Calendar Event" && i.datetime), [history]);
 

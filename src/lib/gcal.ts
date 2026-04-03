@@ -94,3 +94,38 @@ export async function deleteGCalEvent(googleEventId: string) {
   });
   if (error) throw new Error(error.message);
 }
+
+// Pulls events from Google Calendar and upserts them into Supabase items table
+export async function syncGCalToLocal(): Promise<number> {
+  try {
+    const conn = await getGCalConnection();
+    if (!conn) return 0;
+
+    const events = await fetchGCalEvents();
+    if (!events.length) return 0;
+
+    const syncKey = getSyncKey();
+    const rows = events
+      .filter((e: any) => e.start?.dateTime || e.start?.date)
+      .map((e: any) => ({
+        id: `gcal_${e.id}`,
+        sync_key: syncKey,
+        type: "Calendar Event",
+        folder: null,
+        title: e.summary || "(No title)",
+        content: e.description || "",
+        datetime: e.start?.dateTime || `${e.start?.date}T00:00:00`,
+        end_datetime: e.end?.dateTime || null,
+        event_color: "#4285f4",
+        done: false,
+        confirmed: true,
+      }));
+
+    const { error } = await supabase.from("items").upsert(rows, { onConflict: "id" });
+    if (error) console.error("Failed to sync GCal events:", error);
+    return rows.length;
+  } catch (e) {
+    console.error("GCal sync error:", e);
+    return 0;
+  }
+}

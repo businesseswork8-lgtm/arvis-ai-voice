@@ -11,7 +11,7 @@ import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { extractItems } from "@/lib/ai";
 import { getSettings, saveItems, updateItem } from "@/lib/storage";
 import { ExtractedItem, SavedItem } from "@/lib/types";
-import { exchangeGCalCode, createGCalEvent, getGCalConnection } from "@/lib/gcal";
+import { exchangeGCalCode, createGCalEvent, getGCalConnection, syncGCalToLocal } from "@/lib/gcal";
 import { Mic, Settings, CheckCheck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -40,6 +40,8 @@ export default function Index() {
           toast.error("Failed to connect Google Calendar");
         } else {
           toast.success(`Google Calendar connected: ${result.email}`);
+          // Immediately pull existing GCal events into Supabase
+          syncGCalToLocal();
         }
       }).catch(() => {
         toast.error("Failed to connect Google Calendar");
