@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getSyncKey } from "./storage";
 
-const VAPID_PUBLIC_KEY = "BGJFVFuxjFQ7RXYFlynwQrV8DiLG3qFuPndCBGy9BosQuysHqNMnerJ48dmgtoH9EKlJedjcpU96CGUpVrcpuXQ";
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "BM3MW6q_AgtETbBZNtIOtiBaBliOJcdyLFvzkv3NB6aCE9h6tkXBFAondxd4-SaULDlZdUa_x6PB6y21EcuBmpY";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);

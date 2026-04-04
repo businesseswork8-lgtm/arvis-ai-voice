@@ -75,7 +75,7 @@ export function RemindersTab() {
 
   return (
     <div className="px-4 pt-4 pb-36 space-y-4">
-      <h1 className="text-xl font-bold text-foreground">Reminders</h1>
+      <h1 className="text-xl font-bold text-foreground pr-10">Reminders</h1>
 
       {/* Filter tabs */}
       <div className="flex bg-secondary rounded-lg p-0.5">
