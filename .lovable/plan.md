@@ -1,24 +1,34 @@
-## Phase 1: Data Model & UI Restructuring
-1. **Bottom Nav** — Change to 4 tabs: Home | Calendar | Tasks | Reminders (remove Folders tab)
-2. **Data Model** — Remove folder field from Tasks, Reminders, Calendar Events. Only Notes have folders. Calendar Events get start/end datetime + color
-3. **Home Screen** — Remove folder management button, show only note folders in the grid, remove Calendar/Tasks/Reminders as folder cards
-4. **Folder Management** — Move add/edit/delete folder UI into Settings screen
+## Declutter App — 5 Changes Plan
 
-## Phase 2: Manual Creation
-5. **Tasks page** — Add floating '+' button with form: Title, Description, Due Date, Due Time (optional)
-6. **Reminders page** — Add floating '+' button with form: Title, Date, Time
-7. **Calendar page** — Add floating '+' button with form: Title, Description, Start Date, Start Time, End Time, Color picker. Also support tapping empty time slots
+### 1. GCal event color fix ✅ (Simple)
+- Change `#4285f4` → `#93c5fd` in `syncGCalToLocal()` in `src/lib/gcal.ts`
 
-## Phase 3: Google Calendar Sync
-8. **Google Calendar OAuth** — Add "Connect Google Calendar" button in Settings using Lovable Cloud's managed Google OAuth
-9. **2-way sync** — Fetch Google Calendar events, push confirmed events/tasks/reminders to Google Calendar, sync edits and deletes
-10. **UI indicators** — Show 'GCal' badge on synced events, show soft banner when not connected
+### 2. Calendar Day view button overlap fix ✅ (Simple)
+- Add right padding to calendar header to prevent overlap with Settings icon
 
-## Phase 4: AI Extraction Updates
-11. **Update system prompt** — Remove folder from Tasks/Reminders/Calendar Events output. Add folder confidence for Notes with picker UI
-12. **Context injection** — Pass last 10 confirmed notes per folder as examples
-13. **Date resolution** — Pass today's date so AI resolves relative dates to ISO
+### 3. AI-powered Home + Notes as 5th tab (Complex)
+- **Home tab**: Remove current box layout. On load, call Gemini API (via edge function using Lovable AI) with today's events/tasks/reminders to generate a natural language daily brief. Show AI summary as hero, then structured sections below.
+- **Notes tab**: Create new `NotesTab.tsx` with folder grid + note browsing
+- **BottomNav**: Add 5th "Notes" tab with notebook icon
+- **Index.tsx**: Wire up the new tab
 
-## Database Migration
-- Add `end_datetime` and `event_color` columns to items table for Calendar Events
-- No other schema changes needed (folder field stays nullable, already works for notes-only)
+### 4. Sub-tasks for Tasks (Medium)
+- **Migration**: Add `parent_id UUID REFERENCES public.items(id) ON DELETE CASCADE` to items table
+- **TasksTab.tsx**: Show only parent tasks (parent_id IS NULL), add expandable sub-task section with chevron, inline "+ Add sub-task" input
+- **Sub-tasks**: Stored as type "Task" with parent_id set
+
+### 5. Web Push Notifications (Complex)
+- **New table**: `push_subscriptions` (id, sync_key, subscription jsonb, created_at)
+- **Service worker**: `/public/sw.js` for push events
+- **Client**: Request permission on load, save subscription to Supabase
+- **Edge function**: `send-notifications` — checks items due soon, sends web push
+- **VAPID keys**: Generate and store as secrets
+- **Scheduling**: Use pg_cron to call the edge function every 15 minutes
+
+### Order of execution:
+1. Migration (parent_id + push_subscriptions table)
+2. Simple fixes (color + calendar overlap)
+3. Notes tab + BottomNav update
+4. AI-powered home (edge function + HomeTab rewrite)
+5. Sub-tasks UI
+6. Web push notifications (service worker + edge function + client registration)

@@ -137,7 +137,7 @@ export function CalendarTab() {
   return (
     <div className="px-4 pt-4 pb-36 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pr-12">
         <h1 className="text-xl font-bold text-foreground">Calendar</h1>
         <div className="flex bg-secondary rounded-lg p-0.5">
           {(["M", "W", "D"] as CalView[]).map((v) => (

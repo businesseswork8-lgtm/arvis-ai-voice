@@ -129,7 +129,7 @@ export async function syncGCalToLocal(): Promise<number> {
             content: e.description || "",
             datetime: e.start?.dateTime || `${e.start?.date}T00:00:00`,
             end_datetime: e.end?.dateTime || null,
-            event_color: "#4285f4",
+            event_color: "#93c5fd",
             google_calendar_event_id: e.id,
             done: false,
             confirmed: true,

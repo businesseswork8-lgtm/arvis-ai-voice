@@ -59,6 +59,7 @@ export type Database = {
           folder: string | null
           google_calendar_event_id: string | null
           id: string
+          parent_id: string | null
           sync_key: string
           title: string
           type: string
@@ -75,6 +76,7 @@ export type Database = {
           folder?: string | null
           google_calendar_event_id?: string | null
           id?: string
+          parent_id?: string | null
           sync_key: string
           title: string
           type: string
@@ -91,10 +93,43 @@ export type Database = {
           folder?: string | null
           google_calendar_event_id?: string | null
           id?: string
+          parent_id?: string | null
           sync_key?: string
           title?: string
           type?: string
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          subscription: Json
+          sync_key: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          subscription: Json
+          sync_key: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          subscription?: Json
+          sync_key?: string
         }
         Relationships: []
       }

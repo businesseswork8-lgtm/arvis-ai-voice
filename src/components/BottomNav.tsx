@@ -1,6 +1,6 @@
-import { Home, CalendarDays, ListTodo, Bell } from "lucide-react";
+import { Home, CalendarDays, ListTodo, Bell, BookOpen } from "lucide-react";
 
-export type TabKey = "home" | "calendar" | "tasks" | "reminders";
+export type TabKey = "home" | "calendar" | "tasks" | "reminders" | "notes";
 
 interface BottomNavProps {
   active: TabKey;
@@ -12,6 +12,7 @@ const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "calendar", label: "Calendar", icon: <CalendarDays className="w-5 h-5" /> },
   { key: "tasks", label: "Tasks", icon: <ListTodo className="w-5 h-5" /> },
   { key: "reminders", label: "Reminders", icon: <Bell className="w-5 h-5" /> },
+  { key: "notes", label: "Notes", icon: <BookOpen className="w-5 h-5" /> },
 ];
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
@@ -22,14 +23,14 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
           <button
             key={tab.key}
             onClick={() => onChange(tab.key)}
-            className={`flex flex-col items-center gap-0.5 px-2 py-1 transition-colors ${
+            className={`flex flex-col items-center gap-0.5 px-1.5 py-1 transition-colors ${
               active === tab.key
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {tab.icon}
-            <span className="text-[10px] font-medium">{tab.label}</span>
+            <span className="text-[9px] font-medium">{tab.label}</span>
           </button>
         ))}
       </div>
