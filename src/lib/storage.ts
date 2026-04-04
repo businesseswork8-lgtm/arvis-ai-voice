@@ -44,6 +44,7 @@ export async function getHistory(): Promise<SavedItem[]> {
     end_datetime: row.end_datetime || undefined,
     event_color: row.event_color || undefined,
     google_calendar_event_id: row.google_calendar_event_id || undefined,
+    parent_id: row.parent_id || undefined,
     confirmed: row.confirmed,
     dismissed: false,
     savedAt: row.created_at,
