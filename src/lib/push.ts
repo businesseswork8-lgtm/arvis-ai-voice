@@ -27,21 +27,22 @@ export async function registerPushSubscription() {
     // Subscribe to push
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
+      const appServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: appServerKey.buffer as ArrayBuffer,
       });
     }
 
     // Save to Supabase
     const syncKey = getSyncKey();
-    const subJson = subscription.toJSON();
+    const subJson = subscription.toJSON() as Record<string, unknown>;
     await supabase.from("push_subscriptions").upsert(
-      {
+      [{
         sync_key: syncKey,
         endpoint: subscription.endpoint,
-        subscription: subJson,
-      },
+        subscription: subJson as any,
+      }],
       { onConflict: "sync_key,endpoint" }
     );
   } catch (e) {
