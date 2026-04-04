@@ -61,6 +61,7 @@ export interface ExtractedItem {
 export interface SavedItem extends ExtractedItem {
   savedAt: string;
   done?: boolean;
+  google_calendar_event_id?: string;
 }
 
 export interface AppSettings {

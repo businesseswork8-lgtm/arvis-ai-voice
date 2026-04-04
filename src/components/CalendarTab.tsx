@@ -6,7 +6,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
-import { syncGCalToLocal } from "@/lib/gcal";
+import { syncGCalToLocal, createGCalEvent, deleteGCalEvent } from "@/lib/gcal";
 import { saveItems, updateItem, deleteItem } from "@/lib/storage";
 import { SavedItem, EVENT_COLORS } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,6 +106,13 @@ export function CalendarTab() {
       };
       await saveItems([item]);
       toast.success("Event created");
+      // Push to Google Calendar in background
+      createGCalEvent({
+        title: item.title,
+        description: item.content,
+        start_datetime: datetime,
+        end_datetime,
+      }).catch((err) => console.error("GCal push failed:", err));
     }
     setShowEventModal(false);
     refresh();
@@ -114,6 +121,10 @@ export function CalendarTab() {
   const handleDeleteEvent = async () => {
     if (!selectedEvent) return;
     await deleteItem(selectedEvent.id);
+    // Also delete from Google Calendar if it was synced there
+    if (selectedEvent.google_calendar_event_id) {
+      deleteGCalEvent(selectedEvent.google_calendar_event_id).catch(() => {});
+    }
     toast.success("Event deleted");
     setShowDetailModal(false);
     refresh();
