@@ -4,6 +4,7 @@ import { HomeTab } from "@/components/HomeTab";
 import { CalendarTab } from "@/components/CalendarTab";
 import { TasksTab } from "@/components/TasksTab";
 import { RemindersTab } from "@/components/RemindersTab";
+import { NotesTab } from "@/components/NotesTab";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { ExtractedCard } from "@/components/ExtractedCard";
 import { SettingsView } from "@/components/SettingsView";
@@ -12,6 +13,7 @@ import { extractItems } from "@/lib/ai";
 import { getSettings, saveItems, updateItem } from "@/lib/storage";
 import { ExtractedItem, SavedItem } from "@/lib/types";
 import { exchangeGCalCode, createGCalEvent, getGCalConnection, syncGCalToLocal } from "@/lib/gcal";
+import { registerPushSubscription } from "@/lib/push";
 import { Mic, Settings, CheckCheck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -33,20 +35,23 @@ export default function Index() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code) {
-      // Clear the URL
       window.history.replaceState({}, "", "/");
       exchangeGCalCode(code).then((result) => {
         if (result.error) {
           toast.error("Failed to connect Google Calendar");
         } else {
           toast.success(`Google Calendar connected: ${result.email}`);
-          // Immediately pull existing GCal events into Supabase
           syncGCalToLocal();
         }
       }).catch(() => {
         toast.error("Failed to connect Google Calendar");
       });
     }
+  }, []);
+
+  // Register push notifications on first load
+  useEffect(() => {
+    registerPushSubscription();
   }, []);
 
   const handleMicPress = () => {
@@ -102,30 +107,22 @@ export default function Index() {
           start_datetime: item.datetime,
           end_datetime: item.end_datetime,
         });
-        if (gcalId) {
-          await updateItem(item.id, { google_calendar_event_id: gcalId });
-        }
+        if (gcalId) await updateItem(item.id, { google_calendar_event_id: gcalId });
       } else if (item.type === "Task" && item.datetime) {
         const gcalId = await createGCalEvent({
           title: `📋 ${item.title}`,
           description: item.content,
           start_datetime: item.datetime,
         });
-        if (gcalId) {
-          await updateItem(item.id, { google_calendar_event_id: gcalId });
-        }
+        if (gcalId) await updateItem(item.id, { google_calendar_event_id: gcalId });
       } else if (item.type === "Reminder" && item.datetime) {
         const gcalId = await createGCalEvent({
           title: `⏰ ${item.title}`,
           start_datetime: item.datetime,
         });
-        if (gcalId) {
-          await updateItem(item.id, { google_calendar_event_id: gcalId });
-        }
+        if (gcalId) await updateItem(item.id, { google_calendar_event_id: gcalId });
       }
-    } catch {
-      // Silently fail GCal sync - don't block the main flow
-    }
+    } catch {}
   };
 
   const confirmItem = async (id: string) => {
@@ -135,7 +132,6 @@ export default function Index() {
     await saveItems([saved]);
     setItems((prev) => prev.filter((i) => i.id !== id));
     toast.success(`Saved: ${item.title}`);
-    // Sync to Google Calendar in background
     syncToGCal(saved);
   };
 
@@ -150,7 +146,6 @@ export default function Index() {
     await saveItems(saved);
     setItems([]);
     toast.success(`Saved ${saved.length} items`);
-    // Sync each to GCal in background
     saved.forEach((s) => syncToGCal(s));
   };
 
@@ -193,6 +188,7 @@ export default function Index() {
         {tab === "calendar" && <CalendarTab />}
         {tab === "tasks" && <TasksTab />}
         {tab === "reminders" && <RemindersTab />}
+        {tab === "notes" && <NotesTab />}
       </div>
 
       <motion.button whileTap={{ scale: 0.9 }} onClick={handleMicPress}

@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SavedItem } from "@/lib/types";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { getSyncKey } from "@/lib/storage";
 
 type TaskFilter = "overdue" | "today" | "future";
 
@@ -18,13 +20,23 @@ export function TasksTab() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newTask, setNewTask] = useState({ title: "", content: "", dueDate: "", dueTime: "" });
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+  const [subTaskInputs, setSubTaskInputs] = useState<Record<string, string>>({});
 
   const now = new Date();
   const todayStart = startOfDay(now);
 
-  const tasks = useMemo(() => history.filter((i) => i.type === "Task"), [history]);
+  // Only show parent tasks (no parent_id)
+  const tasks = useMemo(() => history.filter((i) => i.type === "Task" && !(i as any).parent_id), [history]);
+  const allTasks = useMemo(() => history.filter((i) => i.type === "Task"), [history]);
   const pending = useMemo(() => tasks.filter((t) => !t.done), [tasks]);
   const completed = useMemo(() => tasks.filter((t) => t.done), [tasks]);
+
+  // Get sub-tasks for a parent
+  const getSubTasks = useCallback(
+    (parentId: string) => allTasks.filter((t) => (t as any).parent_id === parentId),
+    [allTasks]
+  );
 
   const filtered = useMemo(() => {
     return pending.filter((t) => {
@@ -78,6 +90,28 @@ export function TasksTab() {
     refresh();
   };
 
+  const handleAddSubTask = async (parentId: string) => {
+    const title = subTaskInputs[parentId]?.trim();
+    if (!title) return;
+    const syncKey = getSyncKey();
+    const { error } = await supabase.from("items").insert({
+      id: crypto.randomUUID(),
+      sync_key: syncKey,
+      type: "Task",
+      title,
+      parent_id: parentId,
+      done: false,
+      confirmed: true,
+    });
+    if (error) {
+      console.error("Failed to create sub-task:", error);
+      return;
+    }
+    setSubTaskInputs((prev) => ({ ...prev, [parentId]: "" }));
+    toast.success("Sub-task added");
+    refresh();
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
@@ -109,22 +143,74 @@ export function TasksTab() {
           <div className="space-y-2">
             {filtered.map((task) => {
               const isOverdue = filter === "overdue";
+              const isExpanded = expandedTask === task.id;
+              const subTasks = getSubTasks(task.id);
               return (
                 <motion.div key={task.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
-                  className="bg-card rounded-xl border border-border p-3 flex items-start gap-3">
-                  <button onClick={() => handleToggle(task.id)}
-                    className="mt-0.5 w-5 h-5 rounded-full border-2 border-primary/50 flex-shrink-0 hover:border-primary transition-colors flex items-center justify-center" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">{task.title}</p>
-                    {task.content && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.content}</p>}
-                    {task.datetime && (
-                      <span className={`inline-block text-[10px] mt-1.5 px-2 py-0.5 rounded-full ${
-                        isOverdue ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground"
-                      }`}>
-                        {format(parseISO(task.datetime), "MMM d")}
-                      </span>
-                    )}
+                  className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="p-3 flex items-start gap-3">
+                    <button onClick={() => handleToggle(task.id)}
+                      className="mt-0.5 w-5 h-5 rounded-full border-2 border-primary/50 flex-shrink-0 hover:border-primary transition-colors flex items-center justify-center" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{task.title}</p>
+                      {task.content && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.content}</p>}
+                      {task.datetime && (
+                        <span className={`inline-block text-[10px] mt-1.5 px-2 py-0.5 rounded-full ${
+                          isOverdue ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground"
+                        }`}>
+                          {format(parseISO(task.datetime), "MMM d")}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setExpandedTask(isExpanded ? null : task.id)}
+                      className="mt-0.5 p-1 rounded hover:bg-secondary transition-colors"
+                    >
+                      {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                    </button>
                   </div>
+
+                  {/* Sub-tasks */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-border/50"
+                      >
+                        <div className="px-3 py-2 pl-11 space-y-1.5">
+                          {subTasks.map((sub) => (
+                            <div key={sub.id} className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleToggle(sub.id)}
+                                className={`w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center transition-colors ${
+                                  sub.done ? "bg-primary/20 border-primary" : "border-muted-foreground/40 hover:border-primary"
+                                }`}
+                              >
+                                {sub.done && <Check className="w-3 h-3 text-primary" />}
+                              </button>
+                              <span className={`text-xs ${sub.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {sub.title}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              value={subTaskInputs[task.id] || ""}
+                              onChange={(e) => setSubTaskInputs((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                              onKeyDown={(e) => e.key === "Enter" && handleAddSubTask(task.id)}
+                              placeholder="+ Add sub-task"
+                              className="flex-1 text-xs bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 py-1"
+                            />
+                            {subTaskInputs[task.id]?.trim() && (
+                              <button onClick={() => handleAddSubTask(task.id)} className="text-xs text-primary font-medium">Add</button>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               );
             })}

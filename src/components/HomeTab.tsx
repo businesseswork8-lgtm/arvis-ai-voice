@@ -1,39 +1,69 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, isBefore, parseISO, startOfDay } from "date-fns";
-import { getAllFolders, getFolderColor, toggleItemDone } from "@/lib/storage";
+import { toggleItemDone } from "@/lib/storage";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
-import { CalendarDays, ListTodo, Bell, Lightbulb, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { CalendarDays, ListTodo, Bell, Check, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function HomeTab() {
   const { items: history, loading, refresh } = useSyncedItems();
+  const [aiSummary, setAiSummary] = useState<string>("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const now = new Date();
-  const greeting = getGreeting();
 
-  const tasks = history.filter((i) => i.type === "Task" && !i.done);
-  const todayEvents = history.filter(
-    (i) => i.type === "Calendar Event" && i.datetime && isToday(parseISO(i.datetime))
+  const todayEvents = useMemo(
+    () => history.filter((i) => i.type === "Calendar Event" && i.datetime && isToday(parseISO(i.datetime)))
+      .sort((a, b) => parseISO(a.datetime!).getTime() - parseISO(b.datetime!).getTime()),
+    [history]
   );
-  const todayReminders = history.filter(
-    (i) => i.type === "Reminder" && !i.done && i.datetime && (isToday(parseISO(i.datetime)) || isBefore(parseISO(i.datetime), startOfDay(now)))
+
+  const todayTasks = useMemo(
+    () => history.filter((i) => i.type === "Task" && !i.done && i.datetime && isToday(parseISO(i.datetime))),
+    [history]
   );
-  const overdueReminders = history.filter(
-    (i) => i.type === "Reminder" && !i.done && i.datetime && isBefore(parseISO(i.datetime), startOfDay(now)) && !isToday(parseISO(i.datetime))
+
+  const overdueTasks = useMemo(
+    () => history.filter((i) => i.type === "Task" && !i.done && i.datetime && isBefore(parseISO(i.datetime), startOfDay(now)) && !isToday(parseISO(i.datetime))),
+    [history]
   );
-  const allActiveReminders = [...overdueReminders, ...todayReminders.filter((r) => !overdueReminders.find((o) => o.id === r.id))];
 
-  const nextEvent = useMemo(() => {
-    const upcoming = history
-      .filter((i) => i.type === "Calendar Event" && i.datetime)
-      .filter((i) => !isBefore(parseISO(i.datetime!), now))
-      .sort((a, b) => parseISO(a.datetime!).getTime() - parseISO(b.datetime!).getTime());
-    return upcoming[0] || null;
-  }, [history]);
+  const todayReminders = useMemo(
+    () => history.filter((i) => i.type === "Reminder" && !i.done && i.datetime && isToday(parseISO(i.datetime))),
+    [history]
+  );
 
-  const folders = getAllFolders();
-  const notes = history.filter((i) => i.type === "Note");
+  const overdueReminders = useMemo(
+    () => history.filter((i) => i.type === "Reminder" && !i.done && i.datetime && isBefore(parseISO(i.datetime), startOfDay(now)) && !isToday(parseISO(i.datetime))),
+    [history]
+  );
 
-  const handleReminderDone = useCallback(async (id: string) => {
+  // Fetch AI daily brief
+  useEffect(() => {
+    if (loading || history.length === 0) return;
+
+    const events = todayEvents.map((e) => ({
+      title: e.title,
+      time: e.datetime ? format(parseISO(e.datetime), "h:mm a") : "all day",
+    }));
+    const tasks = [...overdueTasks, ...todayTasks].map((t) => ({ title: t.title }));
+    const reminders = [...overdueReminders, ...todayReminders].map((r) => ({
+      title: r.title,
+      time: r.datetime ? format(parseISO(r.datetime), "h:mm a") : "",
+    }));
+
+    setSummaryLoading(true);
+    supabase.functions
+      .invoke("daily-brief", { body: { events, tasks, reminders } })
+      .then(({ data, error }) => {
+        if (data?.summary) setAiSummary(data.summary);
+        else if (data?.error) console.error("Brief error:", data.error);
+      })
+      .catch(() => {})
+      .finally(() => setSummaryLoading(false));
+  }, [loading, history.length]);
+
+  const handleToggle = useCallback(async (id: string) => {
     await toggleItemDone(id);
     refresh();
   }, [refresh]);
@@ -46,8 +76,10 @@ export function HomeTab() {
     );
   }
 
+  const greeting = getGreeting();
+
   return (
-    <div className="px-4 pt-4 pb-36 space-y-6">
+    <div className="px-4 pt-4 pb-36 space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">
@@ -59,115 +91,115 @@ export function HomeTab() {
         </p>
       </div>
 
-      {/* Summary */}
-      <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's Summary</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <SummaryChip icon={<ListTodo className="w-4 h-4" />} label="Tasks" value={tasks.length} />
-          <SummaryChip icon={<CalendarDays className="w-4 h-4" />} label="Events today" value={todayEvents.length} />
-          <SummaryChip icon={<Bell className="w-4 h-4" />} label="Reminders" value={history.filter((i) => i.type === "Reminder" && !i.done).length} />
-          <SummaryChip icon={<Lightbulb className="w-4 h-4" />} label="Notes" value={notes.length} />
+      {/* AI Daily Brief */}
+      <div className="bg-card rounded-2xl border border-border p-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <h2 className="text-xs font-semibold text-primary uppercase tracking-wider">Daily Brief</h2>
         </div>
-        {nextEvent && (
-          <div className="bg-secondary/50 rounded-xl p-3 mt-2">
-            <p className="text-xs text-muted-foreground">Next up</p>
-            <p className="text-sm font-medium text-foreground">{nextEvent.title}</p>
-            {nextEvent.datetime && (
-              <p className="text-xs text-primary mt-0.5">{format(parseISO(nextEvent.datetime), "MMM d, h:mm a")}</p>
-            )}
+        {summaryLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground">Generating your brief...</span>
           </div>
+        ) : aiSummary ? (
+          <p className="text-sm text-foreground leading-relaxed">{aiSummary}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">
+            {history.length === 0
+              ? "No items yet. Use the mic to add events, tasks, and reminders."
+              : `${greeting}! You have ${todayEvents.length} events, ${todayTasks.length + overdueTasks.length} tasks, and ${todayReminders.length + overdueReminders.length} reminders today.`}
+          </p>
         )}
       </div>
 
-      {/* Reminders Section */}
-      {allActiveReminders.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Reminders</h2>
-          <AnimatePresence>
-            {allActiveReminders.slice(0, 5).map((reminder) => {
-              const isOverdue = reminder.datetime && isBefore(parseISO(reminder.datetime), startOfDay(now)) && !isToday(parseISO(reminder.datetime));
-              return (
-                <motion.div
-                  key={reminder.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: 100 }}
-                  className="bg-card rounded-xl border border-border p-3 flex items-center gap-3"
-                >
-                  <Bell className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{reminder.title}</p>
-                    {reminder.datetime && (
-                      <p className={`text-xs mt-0.5 ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
-                        {format(parseISO(reminder.datetime), "MMM d, h:mm a")}
-                        {isOverdue && " · Overdue"}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleReminderDone(reminder.id)}
-                    className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center hover:bg-primary/20 transition-colors flex-shrink-0"
-                  >
-                    <Check className="w-4 h-4 text-primary" />
-                  </button>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* Pending Tasks */}
-      {tasks.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pending Tasks</h2>
-          {tasks.slice(0, 3).map((task) => (
-            <div key={task.id} className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full border-2 border-primary/50 flex-shrink-0" />
+      {/* Today's Events */}
+      {todayEvents.length > 0 && (
+        <Section title="Today's Events" icon={<CalendarDays className="w-4 h-4" />} count={todayEvents.length}>
+          {todayEvents.map((event) => (
+            <div key={event.id} className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
+              <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: event.event_color || "#6366f1" }} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-                {task.datetime && <p className="text-xs text-muted-foreground">{format(parseISO(task.datetime), "MMM d")}</p>}
+                <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
+                {event.datetime && (
+                  <p className="text-xs text-muted-foreground">
+                    {format(parseISO(event.datetime), "h:mm a")}
+                    {event.end_datetime && ` – ${format(parseISO(event.end_datetime), "h:mm a")}`}
+                  </p>
+                )}
               </div>
             </div>
           ))}
-        </div>
+        </Section>
       )}
 
-      {/* Note Folders */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Note Folders</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {folders.slice(0, 8).map((f) => {
-            const count = notes.filter((i) => i.folder === f.key).length;
-            const folderColor = f.color || "#6366f1";
+      {/* Due Today — Tasks */}
+      {(todayTasks.length > 0 || overdueTasks.length > 0) && (
+        <Section title="Due Today" icon={<ListTodo className="w-4 h-4" />} count={todayTasks.length + overdueTasks.length}>
+          {[...overdueTasks, ...todayTasks].map((task) => {
+            const isOverdue = task.datetime && isBefore(parseISO(task.datetime), startOfDay(now)) && !isToday(parseISO(task.datetime));
             return (
-              <div
-                key={f.key}
-                className="rounded-xl border border-border p-3 flex items-center gap-3"
-                style={{ backgroundColor: `${folderColor}08`, borderColor: `${folderColor}30` }}
-              >
-                <span className="text-xl">{f.emoji}</span>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{f.label}</p>
-                  <p className="text-xs text-muted-foreground">{count} notes</p>
+              <div key={task.id} className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
+                <button
+                  onClick={() => handleToggle(task.id)}
+                  className="w-5 h-5 rounded-full border-2 border-primary/50 flex-shrink-0 hover:border-primary transition-colors flex items-center justify-center"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+                  {isOverdue && <span className="text-[10px] text-destructive">Overdue</span>}
                 </div>
               </div>
             );
           })}
-        </div>
-      </div>
+        </Section>
+      )}
+
+      {/* Due Today — Reminders */}
+      {(todayReminders.length > 0 || overdueReminders.length > 0) && (
+        <Section title="Reminders" icon={<Bell className="w-4 h-4" />} count={todayReminders.length + overdueReminders.length}>
+          {[...overdueReminders, ...todayReminders].map((reminder) => {
+            const isOverdue = reminder.datetime && isBefore(parseISO(reminder.datetime), startOfDay(now)) && !isToday(parseISO(reminder.datetime));
+            return (
+              <div key={reminder.id} className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
+                <Bell className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">{reminder.title}</p>
+                  <p className={`text-xs mt-0.5 ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
+                    {reminder.datetime && format(parseISO(reminder.datetime), "h:mm a")}
+                    {isOverdue && " · Overdue"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleToggle(reminder.id)}
+                  className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center hover:bg-primary/20 transition-colors flex-shrink-0"
+                >
+                  <Check className="w-4 h-4 text-primary" />
+                </button>
+              </div>
+            );
+          })}
+        </Section>
+      )}
+
+      {/* Empty state */}
+      {todayEvents.length === 0 && todayTasks.length === 0 && overdueTasks.length === 0 && todayReminders.length === 0 && overdueReminders.length === 0 && (
+        <p className="text-sm text-muted-foreground/50 text-center py-8">
+          Nothing due today. Enjoy your day! 🎉
+        </p>
+      )}
     </div>
   );
 }
 
-function SummaryChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function Section({ title, icon, count, children }: { title: string; icon: React.ReactNode; count: number; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 bg-secondary/50 rounded-xl p-2.5">
-      <div className="text-primary">{icon}</div>
-      <div>
-        <p className="text-lg font-bold text-foreground leading-none">{value}</p>
-        <p className="text-[10px] text-muted-foreground">{label}</p>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-primary">{icon}</span>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</h2>
+        <span className="text-xs text-muted-foreground">({count})</span>
       </div>
+      {children}
     </div>
   );
 }
