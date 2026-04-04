@@ -88,7 +88,7 @@ export function NotesTab() {
 
   return (
     <div className="px-4 pt-4 pb-36 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pr-10">
         <h1 className="text-xl font-bold text-foreground">Notes</h1>
         <button onClick={() => setShowFolderManager(true)} className="p-2 rounded-lg hover:bg-secondary transition-colors">
           <Settings2 className="w-5 h-5 text-muted-foreground" />

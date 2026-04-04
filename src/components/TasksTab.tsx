@@ -118,7 +118,7 @@ export function TasksTab() {
 
   return (
     <div className="px-4 pt-4 pb-36 space-y-4">
-      <h1 className="text-xl font-bold text-foreground">Tasks</h1>
+      <h1 className="text-xl font-bold text-foreground pr-10">Tasks</h1>
 
       {/* Filter tabs */}
       <div className="flex bg-secondary rounded-lg p-0.5">
