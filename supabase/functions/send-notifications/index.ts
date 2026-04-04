@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.101.1";
 
 // Web Push requires VAPID authentication
 // Using the web-push npm package equivalent for Deno
-const VAPID_PUBLIC_KEY = "BPl0eMqojJp9WJwG0q3q3hXTMN5RddM9JhJ9xNRbMUGfEfULNu7bjqL3qHVPFNwbF3YP9pOwu3L38VEKy0a1jxQ";
+const VAPID_PUBLIC_KEY = "BGJFVFuxjFQ7RXYFlynwQrV8DiLG3qFuPndCBGy9BosQuysHqNMnerJ48dmgtoH9EKlJedjcpU96CGUpVrcpuXQ";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
