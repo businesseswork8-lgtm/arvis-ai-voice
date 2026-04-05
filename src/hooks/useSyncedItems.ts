@@ -7,7 +7,6 @@ export function useSyncedItems() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     const data = await getHistory();
     setItems(data);
     setLoading(false);
@@ -15,6 +14,10 @@ export function useSyncedItems() {
 
   useEffect(() => {
     refresh();
+
+    const handleUpdate = () => refresh();
+    window.addEventListener("items-updated", handleUpdate);
+    return () => window.removeEventListener("items-updated", handleUpdate);
   }, [refresh]);
 
   return { items, loading, refresh };

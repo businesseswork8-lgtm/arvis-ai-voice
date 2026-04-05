@@ -70,6 +70,7 @@ export async function saveItems(items: SavedItem[]) {
 
   const { error } = await supabase.from("items").upsert(rows);
   if (error) console.error("Failed to save items:", error);
+  else window.dispatchEvent(new CustomEvent("items-updated"));
 }
 
 export async function toggleItemDone(id: string) {
@@ -81,22 +82,26 @@ export async function toggleItemDone(id: string) {
     .update({ done: !data.done })
     .eq("id", id);
   if (error) console.error("Failed to toggle item:", error);
+  else window.dispatchEvent(new CustomEvent("items-updated"));
 }
 
 export async function updateItem(id: string, updates: Record<string, any>) {
   const { error } = await supabase.from("items").update(updates).eq("id", id);
   if (error) console.error("Failed to update item:", error);
+  else window.dispatchEvent(new CustomEvent("items-updated"));
 }
 
 export async function deleteItem(id: string) {
   const { error } = await supabase.from("items").delete().eq("id", id);
   if (error) console.error("Failed to delete item:", error);
+  else window.dispatchEvent(new CustomEvent("items-updated"));
 }
 
 export async function clearHistory() {
   const syncKey = getSyncKey();
   const { error } = await supabase.from("items").delete().eq("sync_key", syncKey);
   if (error) console.error("Failed to clear history:", error);
+  else window.dispatchEvent(new CustomEvent("items-updated"));
 }
 
 // ─── Settings (localStorage only — device-specific) ─────
