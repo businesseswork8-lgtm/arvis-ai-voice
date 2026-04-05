@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from "react";
 import { format, parseISO, isToday, isBefore, startOfDay } from "date-fns";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
-import { toggleItemDone, saveItems } from "@/lib/storage";
+import { toggleItemDone, saveItems, updateItem } from "@/lib/storage";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Check, Undo2, Plus } from "lucide-react";
+import { Bell, Check, Undo2, Plus, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SavedItem } from "@/lib/types";
 import { toast } from "sonner";
@@ -16,7 +17,9 @@ export function RemindersTab() {
   const { items: history, loading, refresh } = useSyncedItems();
   const [filter, setFilter] = useState<ReminderFilter>("active");
   const [showForm, setShowForm] = useState(false);
-  const [newReminder, setNewReminder] = useState({ title: "", date: "", time: "" });
+  const [newReminder, setNewReminder] = useState({ title: "", date: format(new Date(), "yyyy-MM-dd"), time: "09:00" });
+  const [editingReminder, setEditingReminder] = useState<SavedItem | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", date: "", time: "" });
   const now = new Date();
   const todayStart = startOfDay(now);
 
@@ -65,7 +68,31 @@ export function RemindersTab() {
     await saveItems([item]);
     toast.success("Reminder created");
     setShowForm(false);
-    setNewReminder({ title: "", date: "", time: "" });
+    setNewReminder({ title: "", date: format(new Date(), "yyyy-MM-dd"), time: "09:00" });
+    refresh();
+  };
+
+  const openEdit = (r: SavedItem) => {
+    const dt = r.datetime ? parseISO(r.datetime) : null;
+    setEditForm({
+      title: r.title,
+      date: dt ? format(dt, "yyyy-MM-dd") : "",
+      time: dt ? format(dt, "HH:mm") : "",
+    });
+    setEditingReminder(r);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingReminder || !editForm.title.trim()) return;
+    const datetime = editForm.date && editForm.time
+      ? `${editForm.date}T${editForm.time}:00`
+      : null;
+    await updateItem(editingReminder.id, {
+      title: editForm.title.trim(),
+      datetime,
+    });
+    toast.success("Reminder updated");
+    setEditingReminder(null);
     refresh();
   };
 
@@ -77,16 +104,12 @@ export function RemindersTab() {
     <div className="px-4 pt-4 pb-36 space-y-4">
       <h1 className="text-xl font-bold text-foreground pr-10">Reminders</h1>
 
-      {/* Filter tabs */}
       <div className="flex bg-secondary rounded-lg p-0.5">
         {(["active", "completed"] as ReminderFilter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
+          <button key={f} onClick={() => setFilter(f)}
             className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors capitalize ${
               filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
+            }`}>
             {f} ({f === "active" ? active.length : completed.length})
           </button>
         ))}
@@ -94,9 +117,9 @@ export function RemindersTab() {
 
       {filter === "active" ? (
         <div className="space-y-4">
-          <ReminderGroup title="Overdue" items={grouped.overdue} isOverdue onToggle={handleToggle} />
-          <ReminderGroup title="Today" items={grouped.today} onToggle={handleToggle} />
-          <ReminderGroup title="Upcoming" items={grouped.upcoming} onToggle={handleToggle} />
+          <ReminderGroup title="Overdue" items={grouped.overdue} isOverdue onToggle={handleToggle} onEdit={openEdit} />
+          <ReminderGroup title="Today" items={grouped.today} onToggle={handleToggle} onEdit={openEdit} />
+          <ReminderGroup title="Upcoming" items={grouped.upcoming} onToggle={handleToggle} onEdit={openEdit} />
           {active.length === 0 && (
             <p className="text-sm text-muted-foreground/50 text-center py-8">No active reminders</p>
           )}
@@ -106,23 +129,16 @@ export function RemindersTab() {
           {completed.length === 0 ? (
             <p className="text-sm text-muted-foreground/50 text-center py-8">No completed reminders</p>
           ) : completed.map((r) => (
-            <motion.div
-              key={r.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-card/50 rounded-xl border border-border/50 p-3 flex items-center gap-3"
-            >
+            <motion.div key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="bg-card/50 rounded-xl border border-border/50 p-3 flex items-center gap-3">
               <Bell className="w-4 h-4 text-muted-foreground/50 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground line-through truncate">{r.title}</p>
                 {r.datetime && <p className="text-xs text-muted-foreground/50">{format(parseISO(r.datetime), "MMM d, h:mm a")}</p>}
               </div>
-              <button
-                onClick={() => handleToggle(r.id)}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-                Undo
+              <button onClick={() => handleToggle(r.id)}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0">
+                <Undo2 className="w-3.5 h-3.5" /> Undo
               </button>
             </motion.div>
           ))}
@@ -130,28 +146,57 @@ export function RemindersTab() {
       )}
 
       {/* FAB */}
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setShowForm(true)}
-        className="fixed bottom-36 right-4 z-40 w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
-      >
+      <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowForm(true)}
+        className="fixed bottom-36 right-4 z-40 w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
         <Plus className="w-5 h-5 text-primary-foreground" />
       </motion.button>
 
       {/* New Reminder Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="bg-card border-border max-w-sm mx-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">New Reminder</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="text-foreground">New Reminder</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input value={newReminder.title} onChange={(e) => setNewReminder((p) => ({ ...p, title: e.target.value }))}
-              placeholder="Reminder title" className="bg-secondary/50 border-border text-foreground" />
-            <Input type="date" value={newReminder.date} onChange={(e) => setNewReminder((p) => ({ ...p, date: e.target.value }))}
-              className="bg-secondary/50 border-border text-foreground" />
-            <Input type="time" value={newReminder.time} onChange={(e) => setNewReminder((p) => ({ ...p, time: e.target.value }))}
-              className="bg-secondary/50 border-border text-foreground" />
+            <div>
+              <Label className="text-foreground text-xs mb-1.5 block">Title</Label>
+              <Input value={newReminder.title} onChange={(e) => setNewReminder((p) => ({ ...p, title: e.target.value }))}
+                placeholder="Reminder title" className="bg-secondary/50 border-border text-foreground" />
+            </div>
+            <div>
+              <Label className="text-foreground text-xs mb-1.5 block">Due date</Label>
+              <Input type="date" value={newReminder.date} onChange={(e) => setNewReminder((p) => ({ ...p, date: e.target.value }))}
+                className="bg-secondary/50 border-border text-foreground" />
+            </div>
+            <div>
+              <Label className="text-foreground text-xs mb-1.5 block">Time</Label>
+              <Input type="time" value={newReminder.time} onChange={(e) => setNewReminder((p) => ({ ...p, time: e.target.value }))}
+                className="bg-secondary/50 border-border text-foreground" />
+            </div>
             <Button onClick={handleCreate} className="w-full">Create Reminder</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Reminder Dialog */}
+      <Dialog open={!!editingReminder} onOpenChange={(open) => !open && setEditingReminder(null)}>
+        <DialogContent className="bg-card border-border max-w-sm mx-auto">
+          <DialogHeader><DialogTitle className="text-foreground">Edit Reminder</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-foreground text-xs mb-1.5 block">Title</Label>
+              <Input value={editForm.title} onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                className="bg-secondary/50 border-border text-foreground" />
+            </div>
+            <div>
+              <Label className="text-foreground text-xs mb-1.5 block">Due date</Label>
+              <Input type="date" value={editForm.date} onChange={(e) => setEditForm((p) => ({ ...p, date: e.target.value }))}
+                className="bg-secondary/50 border-border text-foreground" />
+            </div>
+            <div>
+              <Label className="text-foreground text-xs mb-1.5 block">Time</Label>
+              <Input type="time" value={editForm.time} onChange={(e) => setEditForm((p) => ({ ...p, time: e.target.value }))}
+                className="bg-secondary/50 border-border text-foreground" />
+            </div>
+            <Button onClick={handleSaveEdit} className="w-full">Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -160,12 +205,13 @@ export function RemindersTab() {
 }
 
 function ReminderGroup({
-  title, items, isOverdue, onToggle,
+  title, items, isOverdue, onToggle, onEdit,
 }: {
   title: string;
-  items: any[];
+  items: SavedItem[];
   isOverdue?: boolean;
   onToggle: (id: string) => void;
+  onEdit: (r: SavedItem) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -175,14 +221,8 @@ function ReminderGroup({
       </h3>
       <AnimatePresence>
         {items.map((r) => (
-          <motion.div
-            key={r.id}
-            layout
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, x: 100 }}
-            className="bg-card rounded-xl border border-border p-3 flex items-center gap-3"
-          >
+          <motion.div key={r.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 100 }}
+            className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
             <Bell className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
@@ -192,10 +232,11 @@ function ReminderGroup({
                 </p>
               )}
             </div>
-            <button
-              onClick={() => onToggle(r.id)}
-              className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center hover:bg-primary/20 transition-colors flex-shrink-0"
-            >
+            <button onClick={() => onEdit(r)} className="p-1 rounded hover:bg-secondary transition-colors flex-shrink-0">
+              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button onClick={() => onToggle(r.id)}
+              className="w-8 h-8 rounded-full border-2 border-primary/50 flex items-center justify-center hover:bg-primary/20 transition-colors flex-shrink-0">
               <Check className="w-4 h-4 text-primary" />
             </button>
           </motion.div>
