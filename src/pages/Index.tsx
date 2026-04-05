@@ -110,19 +110,6 @@ export default function Index() {
           end_datetime: item.end_datetime,
         });
         if (gcalId) await updateItem(item.id, { google_calendar_event_id: gcalId });
-      } else if (item.type === "Task" && item.datetime) {
-        const gcalId = await createGCalEvent({
-          title: `📋 ${item.title}`,
-          description: item.content,
-          start_datetime: item.datetime,
-        });
-        if (gcalId) await updateItem(item.id, { google_calendar_event_id: gcalId });
-      } else if (item.type === "Reminder" && item.datetime) {
-        const gcalId = await createGCalEvent({
-          title: `⏰ ${item.title}`,
-          start_datetime: item.datetime,
-        });
-        if (gcalId) await updateItem(item.id, { google_calendar_event_id: gcalId });
       }
     } catch {}
   };
