@@ -1,4 +1,5 @@
-import { X, Square } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Square, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RecordingOverlayProps {
@@ -8,6 +9,7 @@ interface RecordingOverlayProps {
   interimTranscript: string;
   onStop: () => void;
   onCancel: () => void;
+  onProcess: (text: string) => void;
 }
 
 export function RecordingOverlay({
@@ -17,7 +19,19 @@ export function RecordingOverlay({
   interimTranscript,
   onStop,
   onCancel,
+  onProcess,
 }: RecordingOverlayProps) {
+  const [editedTranscript, setEditedTranscript] = useState("");
+
+  // Update the text box continuously while recording
+  useEffect(() => {
+    if (isRecording) {
+      setEditedTranscript(finalTranscript);
+    }
+  }, [finalTranscript, isRecording]);
+
+  const fullText = (finalTranscript + " " + interimTranscript).trim();
+
   return (
     <motion.div
       initial={{ y: "100%" }}
@@ -28,11 +42,11 @@ export function RecordingOverlay({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
-        <button onClick={onCancel} className="p-2 rounded-full hover:bg-secondary transition-colors">
+        <button onClick={onCancel} className="p-2 rounded-full hover:bg-secondary transition-colors" disabled={isProcessing}>
           <X className="w-6 h-6 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium text-muted-foreground">
-          {isProcessing ? "Processing..." : "Recording"}
+          {isProcessing ? "Organizing..." : isRecording ? "Listening" : "Review"}
         </span>
         <div className="w-10" />
       </div>
@@ -50,28 +64,53 @@ export function RecordingOverlay({
           </div>
         )}
 
-        {/* Transcript */}
-        <div className="w-full max-w-md min-h-[120px] bg-secondary/30 rounded-2xl p-5">
-          {!finalTranscript && !interimTranscript ? (
-            <p className="text-muted-foreground text-center text-sm">Listening...</p>
+        {/* Transcript / Edit Box */}
+        <div className="w-full max-w-md bg-secondary/30 rounded-2xl overflow-hidden relative">
+          {isRecording ? (
+            <div className="min-h-[160px] p-5">
+              {!finalTranscript && !interimTranscript ? (
+                <p className="text-muted-foreground text-center text-sm pt-8">Listening...</p>
+              ) : (
+                <p className="text-sm leading-relaxed">
+                  {finalTranscript && <span className="text-foreground">{finalTranscript} </span>}
+                  {interimTranscript && <span className="text-muted-foreground">{interimTranscript}</span>}
+                </p>
+              )}
+            </div>
           ) : (
-            <p className="text-sm leading-relaxed">
-              {finalTranscript && <span className="text-foreground">{finalTranscript} </span>}
-              {interimTranscript && <span className="text-muted-foreground">{interimTranscript}</span>}
-            </p>
+            <div className="min-h-[160px] flex flex-col p-2">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 px-3 pt-2">Edit before organizing</p>
+              <textarea
+                value={editedTranscript || fullText}
+                onChange={(e) => setEditedTranscript(e.target.value)}
+                disabled={isProcessing}
+                className="w-full flex-1 min-h-[120px] bg-transparent text-foreground text-sm leading-relaxed resize-none focus:outline-none p-3 border border-border/50 rounded-xl"
+                placeholder="Type here..."
+              />
+            </div>
           )}
         </div>
       </div>
 
-      {/* Stop button */}
-      <div className="flex justify-center pb-12">
-        <button
-          onClick={onStop}
-          disabled={isProcessing}
-          className="w-16 h-16 rounded-full bg-recording flex items-center justify-center glow-recording disabled:opacity-50 transition-all"
-        >
-          <Square className="w-6 h-6 text-foreground fill-foreground" />
-        </button>
+      {/* Actions */}
+      <div className="flex justify-center pb-12 gap-6">
+        {isRecording ? (
+          <button
+            onClick={onStop}
+            className="w-16 h-16 rounded-full bg-recording flex items-center justify-center glow-recording transition-transform active:scale-95"
+          >
+            <Square className="w-6 h-6 text-foreground fill-foreground" />
+          </button>
+        ) : (
+          <button
+            onClick={() => onProcess(editedTranscript || fullText)}
+            disabled={isProcessing || !(editedTranscript || fullText).trim()}
+            className="h-14 px-8 rounded-full bg-primary text-primary-foreground font-semibold flex items-center gap-3 shadow-lg glow-primary disabled:opacity-50 transition-transform active:scale-95"
+          >
+            <Send className="w-5 h-5" />
+            Organize
+          </button>
+        )}
       </div>
     </motion.div>
   );

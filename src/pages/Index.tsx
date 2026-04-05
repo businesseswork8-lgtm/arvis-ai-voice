@@ -64,11 +64,13 @@ export default function Index() {
     setShowRecording(false);
   };
 
-  const handleStop = useCallback(async () => {
+  const handleStop = useCallback(() => {
     stopRecording();
-    const text = fullTranscript;
-    if (!text?.trim()) {
-      toast.error("No speech detected. Try again.");
+  }, [stopRecording]);
+
+  const handleProcess = useCallback(async (textToProcess: string) => {
+    if (!textToProcess?.trim()) {
+      toast.error("No text detected. Try again.");
       setShowRecording(false);
       return;
     }
@@ -80,7 +82,7 @@ export default function Index() {
     }
     setIsProcessing(true);
     try {
-      const extracted = await extractItems(text, settings.apiKey, settings.model);
+      const extracted = await extractItems(textToProcess, settings.apiKey, settings.model);
       setItems(extracted);
       resetTranscript();
       setShowRecording(false);
@@ -89,7 +91,7 @@ export default function Index() {
     } finally {
       setIsProcessing(false);
     }
-  }, [fullTranscript, stopRecording, resetTranscript]);
+  }, [resetTranscript]);
 
   const updateItemState = (id: string, updates: Partial<ExtractedItem>) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
@@ -203,7 +205,7 @@ export default function Index() {
         {showRecording && (
           <RecordingOverlay isRecording={isRecording} isProcessing={isProcessing}
             finalTranscript={finalTranscript} interimTranscript={interimTranscript}
-            onStop={handleStop} onCancel={handleCancel} />
+            onStop={handleStop} onCancel={handleCancel} onProcess={handleProcess} />
         )}
       </AnimatePresence>
     </div>

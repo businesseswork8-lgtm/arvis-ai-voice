@@ -62,12 +62,12 @@ export function useVoiceRecording(): UseVoiceRecordingReturn {
       }
       setInterimTranscript(interim);
 
-      // 1-second silence detection: restart timer on each result
+      // 3-second silence detection: restart timer on each result
       silenceTimerRef.current = setTimeout(() => {
         if (recognitionRef.current) {
           recognitionRef.current.stop();
         }
-      }, 1500);
+      }, 3000);
     };
 
     recognition.onerror = (e: any) => {
