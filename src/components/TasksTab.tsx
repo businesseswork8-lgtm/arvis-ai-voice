@@ -41,22 +41,22 @@ export function TasksTab() {
 
   const filtered = useMemo(() => {
     return pending.filter((t) => {
-      if (!t.datetime) return filter === "future";
+      if (!t.datetime) return filter === "today"; // Show dateless tasks in Today so they don't get lost
       const dt = parseISO(t.datetime);
       if (filter === "overdue") return isBefore(dt, todayStart);
       if (filter === "today") return isToday(dt);
       return isAfter(dt, startOfDay(now)) && !isToday(dt);
     }).sort((a, b) => {
-      if (!a.datetime) return 1;
-      if (!b.datetime) return -1;
+      if (!a.datetime) return -1; // Dateless tasks stay at top of Today
+      if (!b.datetime) return 1;
       return parseISO(a.datetime).getTime() - parseISO(b.datetime).getTime();
     });
   }, [pending, filter, todayStart]);
 
   const counts = useMemo(() => ({
     overdue: pending.filter((t) => t.datetime && isBefore(parseISO(t.datetime), todayStart)).length,
-    today: pending.filter((t) => t.datetime && isToday(parseISO(t.datetime))).length,
-    future: pending.filter((t) => !t.datetime || (isAfter(parseISO(t.datetime), startOfDay(now)) && !isToday(parseISO(t.datetime)))).length,
+    today: pending.filter((t) => !t.datetime || isToday(parseISO(t.datetime))).length,
+    future: pending.filter((t) => t.datetime && isAfter(parseISO(t.datetime), startOfDay(now)) && !isToday(parseISO(t.datetime))).length,
   }), [pending, todayStart]);
 
   const handleToggle = useCallback(async (id: string) => {
