@@ -43,33 +43,73 @@ IMPORTANT: Tasks, Reminders, and Calendar Events do NOT have a folder field.
 
 Return a JSON array of items. Only return the JSON array, nothing else. No markdown, no explanation.`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `${systemPrompt}\n\nHere is the transcript:\n${transcript}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.3,
-        },
-      }),
-    }
-  );
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`AI request failed: ${response.status} — ${err}`);
+  // The requested model + safe fallbacks
+  const modelsToTry = [model, "gemini-1.5-flash", "gemini-1.5-pro"].filter((v, i, a) => a.indexOf(v) === i);
+  
+  let lastError = null;
+  let response = null;
+  
+  // Try up to 3 models, and for 429s (Rate Limit), retry the same model up to 2 times with backoff
+  for (const currentModel of modelsToTry) {
+    let retries = 2; // Allow 2 retries per model for 429s
+    let currentAttempt = 0;
+    
+    while (currentAttempt <= retries) {
+      if (currentAttempt > 0) {
+        // Exponential backoff: 1.5s, then 3s
+        const waitTime = 1500 * Math.pow(2, currentAttempt - 1);
+        console.log(`[AI Retry] Waiting ${waitTime}ms before retry...`);
+        await delay(waitTime);
+      }
+      
+      try {
+        console.log(`[AI] Attempting extraction with model: ${currentModel}`);
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `${systemPrompt}\n\nHere is the transcript:\n${transcript}` }] }],
+              generationConfig: { temperature: 0.3 },
+            }),
+          }
+        );
+
+        if (response.ok) {
+          break; // Success! Break out of the while loop
+        }
+
+        const errStatus = response.status;
+        const errText = await response.text();
+        lastError = new Error(`AI request failed: ${errStatus} — ${errText}`);
+        
+        if (errStatus === 429) {
+          console.warn(`[AI] Rate limit (429) hit on ${currentModel}. Retrying... (Attempt ${currentAttempt + 1}/${retries + 1})`);
+          currentAttempt++;
+        } else if (errStatus === 404) {
+          console.warn(`[AI] Model not found (404) for ${currentModel}. Moving to fallback model.`);
+          break; // Break the while loop to move to the NEXT model in the for loop
+        } else {
+          // Bad request, auth error, etc. Break while loop, try fallback model.
+          break; 
+        }
+      } catch (e) {
+        lastError = e;
+        // Network error, retry same model
+        currentAttempt++;
+      }
+    }
+    
+    if (response?.ok) {
+      break; // Success! Break out of the outer for loop
+    }
+  }
+
+  if (!response?.ok) {
+    throw lastError || new Error("AI extraction failed after retries and fallbacks.");
   }
 
   const data = await response.json();
