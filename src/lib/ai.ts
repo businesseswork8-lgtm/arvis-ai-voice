@@ -125,7 +125,7 @@ Return a JSON array of items. Only return the JSON array, nothing else. No markd
   const parsed: any[] = JSON.parse(jsonStr);
 
   return parsed.map((item: any, i: number) => ({
-    id: `${Date.now()}-${i}`,
+    id: crypto.randomUUID(),
     type: item.type || "Note",
     folder: item.type === "Note" ? (item.folder || "personal") : "",
     title: item.title || "Untitled",
