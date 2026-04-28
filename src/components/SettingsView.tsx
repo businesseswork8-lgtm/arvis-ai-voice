@@ -177,7 +177,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
         {/* Clear Data */}
         <div className="pt-4 border-t border-border">
-          <Button variant="destructive" onClick={async () => { await clearHistory(); toast.success("All data cleared"); }} className="w-full">
+          <Button variant="destructive" onClick={async () => {
+            if (!window.confirm("This will permanently delete ALL your tasks, reminders, events, and notes. This cannot be undone. Are you sure?")) return;
+            await clearHistory();
+            toast.success("All data cleared");
+          }} className="w-full">
             <Trash2 className="w-4 h-4 mr-2" />
             Clear All Synced Data
           </Button>

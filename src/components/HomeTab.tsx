@@ -38,9 +38,22 @@ export function HomeTab() {
     [history]
   );
 
-  // Fetch AI daily brief
+  // Fetch AI daily brief — cached per day in localStorage
   useEffect(() => {
     if (loading || history.length === 0) return;
+
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const BRIEF_KEY = "declutter_brief_cache";
+    try {
+      const cached = localStorage.getItem(BRIEF_KEY);
+      if (cached) {
+        const { date, summary } = JSON.parse(cached);
+        if (date === todayStr && summary) {
+          setAiSummary(summary);
+          return; // Use cached brief for today
+        }
+      }
+    } catch {}
 
     const events = todayEvents.map((e) => ({
       title: e.title,
@@ -53,20 +66,24 @@ export function HomeTab() {
     }));
 
     setSummaryLoading(true);
+    const timeout = setTimeout(() => setSummaryLoading(false), 10000); // 10s max
     supabase.functions
       .invoke("daily-brief", { body: { events, tasks, reminders } })
-      .then(({ data, error }) => {
-        if (data?.summary) setAiSummary(data.summary);
-        else if (data?.error) console.error("Brief error:", data.error);
+      .then(({ data }) => {
+        if (data?.summary) {
+          setAiSummary(data.summary);
+          try {
+            localStorage.setItem(BRIEF_KEY, JSON.stringify({ date: todayStr, summary: data.summary }));
+          } catch {}
+        }
       })
       .catch(() => {})
-      .finally(() => setSummaryLoading(false));
-  }, [loading, history.length]);
+      .finally(() => { clearTimeout(timeout); setSummaryLoading(false); });
+  }, [loading]); // Only re-run when loading state changes, not on every item update
 
   const handleToggle = useCallback(async (id: string) => {
     await toggleItemDone(id);
-    refresh();
-  }, [refresh]);
+  }, []);
 
   if (loading) {
     return (

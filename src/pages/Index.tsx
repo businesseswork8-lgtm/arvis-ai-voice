@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { BottomNav, TabKey } from "@/components/BottomNav";
 import { HomeTab } from "@/components/HomeTab";
 import { CalendarTab } from "@/components/CalendarTab";
@@ -9,12 +9,12 @@ import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { ExtractedCard } from "@/components/ExtractedCard";
 import { SettingsView } from "@/components/SettingsView";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
-import { extractItems } from "@/lib/ai";
+import { extractItems, transcribeAudioFile } from "@/lib/ai";
 import { getSettings, saveItems, updateItem } from "@/lib/storage";
 import { ExtractedItem, SavedItem } from "@/lib/types";
 import { exchangeGCalCode, createGCalEvent, getGCalConnection, syncGCalToLocal } from "@/lib/gcal";
 import { registerPushSubscription } from "@/lib/push";
-import { Mic, Settings, CheckCheck } from "lucide-react";
+import { Mic, Settings, CheckCheck, Upload } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -24,13 +24,16 @@ export default function Index() {
   const [showRecording, setShowRecording] = useState(false);
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [uploadedTranscript, setUploadedTranscript] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
-    isRecording, interimTranscript, finalTranscript, fullTranscript,
+    isRecording, interimTranscript, finalTranscript,
     startRecording, stopRecording, cancelRecording, resetTranscript,
   } = useVoiceRecording();
 
-  // Handle Google Calendar OAuth callback
+  // Handle Google Calendar OAuth callback + sync on app start
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -46,6 +49,8 @@ export default function Index() {
       }).catch(() => {
         toast.error("Failed to connect Google Calendar");
       });
+    } else {
+      syncGCalToLocal().catch(() => {});
     }
   }, []);
 
@@ -55,13 +60,49 @@ export default function Index() {
   }, []);
 
   const handleMicPress = () => {
+    setUploadedTranscript(null);
     setShowRecording(true);
     startRecording();
+  };
+
+  const handleUploadPress = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAudioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    (e.target as HTMLInputElement).value = ""; // reset so same file can be re-selected
+    if (!file) return;
+
+    const settings = getSettings();
+    if (!settings.apiKey) {
+      toast.error("Please add your Gemini API key in Settings first.");
+      return;
+    }
+
+    // Open overlay immediately in "transcribing" mode
+    setUploadedTranscript(null);
+    setIsTranscribing(true);
+    setShowRecording(true);
+
+    try {
+      toast.info(`Transcribing "${file.name}"…`);
+      const transcript = await transcribeAudioFile(file, settings.apiKey, settings.model);
+      setUploadedTranscript(transcript);
+    } catch (err: any) {
+      toast.error(err.message || "Transcription failed. Try again.");
+      setShowRecording(false);
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   const handleCancel = () => {
     cancelRecording();
     setShowRecording(false);
+    setUploadedTranscript(null);
+    setIsTranscribing(false);
   };
 
   const handleStop = useCallback(() => {
@@ -83,8 +124,13 @@ export default function Index() {
     setIsProcessing(true);
     try {
       const extracted = await extractItems(textToProcess, settings.apiKey, settings.model);
+      if (extracted.length === 0) {
+        toast.error("Nothing actionable found. Try rephrasing.");
+        return;
+      }
       setItems(extracted);
       resetTranscript();
+      setUploadedTranscript(null);
       setShowRecording(false);
     } catch (e: any) {
       toast.error(e.message || "Failed to process. Try again.");
@@ -101,7 +147,6 @@ export default function Index() {
     try {
       const conn = await getGCalConnection();
       if (!conn) return;
-
       if (item.type === "Calendar Event" && item.datetime) {
         const gcalId = await createGCalEvent({
           title: item.title,
@@ -134,7 +179,7 @@ export default function Index() {
     }));
     await saveItems(saved);
     setItems([]);
-    toast.success(`Saved ${saved.length} items`);
+    toast.success(`Saved ${saved.length} item${saved.length !== 1 ? "s" : ""}`);
     saved.forEach((s) => syncToGCal(s));
   };
 
@@ -144,12 +189,14 @@ export default function Index() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Settings button */}
       <div className="fixed top-3 right-3 z-30">
         <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-secondary transition-colors">
           <Settings className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
 
+      {/* Extracted items overlay */}
       <AnimatePresence>
         {activeItems.length > 0 && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -172,27 +219,64 @@ export default function Index() {
         )}
       </AnimatePresence>
 
+      {/* Tab content — always mounted so event listeners stay alive */}
       <div className="flex-1">
-        {tab === "home" && <HomeTab />}
-        {tab === "calendar" && <CalendarTab />}
-        {tab === "tasks" && <TasksTab />}
-        {tab === "reminders" && <RemindersTab />}
-        {tab === "notes" && <NotesTab />}
+        <div style={{ display: tab === "home" ? "block" : "none" }}><HomeTab /></div>
+        <div style={{ display: tab === "calendar" ? "block" : "none" }}><CalendarTab /></div>
+        <div style={{ display: tab === "tasks" ? "block" : "none" }}><TasksTab /></div>
+        <div style={{ display: tab === "reminders" ? "block" : "none" }}><RemindersTab /></div>
+        <div style={{ display: tab === "notes" ? "block" : "none" }}><NotesTab /></div>
       </div>
 
-      <motion.button whileTap={{ scale: 0.9 }} onClick={handleMicPress}
-        className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg glow-primary"
-        style={{ animation: "mic-pulse 2s ease-in-out infinite" }}>
-        <Mic className="w-6 h-6 text-primary-foreground" />
-      </motion.button>
+      {/* Mic + Upload FAB buttons */}
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
+        {/* Upload audio button */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleUploadPress}
+          title="Upload voice memo"
+          className="w-11 h-11 rounded-full bg-secondary border border-border flex items-center justify-center shadow-md hover:bg-secondary/80 transition-colors"
+        >
+          <Upload className="w-4 h-4 text-muted-foreground" />
+        </motion.button>
+
+        {/* Main mic button */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleMicPress}
+          title="Record voice note"
+          className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg glow-primary"
+          style={{ animation: "mic-pulse 2s ease-in-out infinite" }}
+        >
+          <Mic className="w-6 h-6 text-primary-foreground" />
+        </motion.button>
+      </div>
+
+      {/* Hidden file input for audio upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*,.m4a,.mp3,.wav,.ogg,.flac,.aiff,.3gp,.webm"
+        className="hidden"
+        onChange={handleAudioFileChange}
+      />
 
       <BottomNav active={tab} onChange={setTab} />
 
+      {/* Recording / Upload overlay */}
       <AnimatePresence>
         {showRecording && (
-          <RecordingOverlay isRecording={isRecording} isProcessing={isProcessing}
-            finalTranscript={finalTranscript} interimTranscript={interimTranscript}
-            onStop={handleStop} onCancel={handleCancel} onProcess={handleProcess} />
+          <RecordingOverlay
+            isRecording={isRecording}
+            isProcessing={isProcessing}
+            isTranscribing={isTranscribing}
+            uploadedTranscript={uploadedTranscript}
+            finalTranscript={finalTranscript}
+            interimTranscript={interimTranscript}
+            onStop={handleStop}
+            onCancel={handleCancel}
+            onProcess={handleProcess}
+          />
         )}
       </AnimatePresence>
     </div>

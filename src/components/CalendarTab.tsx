@@ -33,13 +33,6 @@ export function CalendarTab() {
   });
   const { items: history, loading, refresh } = useSyncedItems();
 
-  // Sync Google Calendar events on mount
-  useEffect(() => {
-    syncGCalToLocal().then((count) => {
-      if (count > 0) refresh();
-    });
-  }, []);
-
   const events = useMemo(() => history.filter((i) => i.type === "Calendar Event" && i.datetime), [history]);
 
   const getEventColor = (event: SavedItem) => event.event_color || DEFAULT_EVENT_COLOR;

@@ -61,8 +61,7 @@ export function TasksTab() {
 
   const handleToggle = useCallback(async (id: string) => {
     await toggleItemDone(id);
-    refresh();
-  }, [refresh]);
+  }, []);
 
   const handleCreate = async () => {
     if (!newTask.title.trim()) return;
@@ -88,7 +87,6 @@ export function TasksTab() {
     toast.success("Task created");
     setShowForm(false);
     setNewTask({ title: "", content: "", dueDate: format(new Date(), "yyyy-MM-dd"), dueTime: "09:00" });
-    refresh();
   };
 
   const openEdit = (task: SavedItem) => {
@@ -117,7 +115,6 @@ export function TasksTab() {
     });
     toast.success("Task updated");
     setEditingTask(null);
-    refresh();
   };
 
   const handleAddSubTask = async (parentId: string) => {
@@ -139,7 +136,7 @@ export function TasksTab() {
     }
     setSubTaskInputs((prev) => ({ ...prev, [parentId]: "" }));
     toast.success("Sub-task added");
-    refresh();
+    window.dispatchEvent(new CustomEvent("items-updated"));
   };
 
   if (loading) {

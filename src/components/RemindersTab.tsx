@@ -47,12 +47,18 @@ export function RemindersTab() {
 
   const handleToggle = useCallback(async (id: string) => {
     await toggleItemDone(id);
-    refresh();
-  }, [refresh]);
+  }, []);
 
   const handleCreate = async () => {
-    if (!newReminder.title.trim() || !newReminder.date || !newReminder.time) return;
-    const datetime = `${newReminder.date}T${newReminder.time}:00`;
+    if (!newReminder.title.trim()) {
+      toast.error("Please enter a reminder title.");
+      return;
+    }
+    const datetime = newReminder.date && newReminder.time
+      ? `${newReminder.date}T${newReminder.time}:00`
+      : newReminder.date
+      ? `${newReminder.date}T09:00:00`
+      : undefined;
     const item: SavedItem = {
       id: crypto.randomUUID(),
       type: "Reminder",
@@ -69,7 +75,6 @@ export function RemindersTab() {
     toast.success("Reminder created");
     setShowForm(false);
     setNewReminder({ title: "", date: format(new Date(), "yyyy-MM-dd"), time: "09:00" });
-    refresh();
   };
 
   const openEdit = (r: SavedItem) => {
@@ -93,7 +98,6 @@ export function RemindersTab() {
     });
     toast.success("Reminder updated");
     setEditingReminder(null);
-    refresh();
   };
 
   if (loading) {
