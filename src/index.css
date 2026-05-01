@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,48 +6,44 @@
 
 @layer base {
   :root {
-    --background: 234 40% 3%;
-    --foreground: 220 20% 90%;
+    /* Pure black foundation */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 96%;
 
-    --card: 234 30% 7%;
-    --card-foreground: 220 20% 90%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 234 30% 7%;
-    --popover-foreground: 220 20% 90%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 245 80% 60%;
+    /* Neon magenta — primary brand color */
+    --primary: 300 100% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 234 25% 12%;
-    --secondary-foreground: 220 20% 85%;
+    /* Dark surface */
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 80%;
 
-    --muted: 234 20% 15%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 185 80% 50%;
-    --accent-foreground: 234 40% 3%;
+    /* Electric blue — secondary accent */
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 234 20% 15%;
-    --input: 234 20% 15%;
-    --ring: 245 80% 60%;
+    --border: 0 0% 13%;
+    --input: 0 0% 10%;
+    --ring: 300 100% 60%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
-    --glow-primary: 245 80% 60%;
-    --glow-accent: 185 80% 50%;
-    --recording: 0 72% 55%;
-
-    --sidebar-background: 234 30% 5%;
-    --sidebar-foreground: 220 20% 90%;
-    --sidebar-primary: 245 80% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 234 25% 12%;
-    --sidebar-accent-foreground: 220 20% 90%;
-    --sidebar-border: 234 20% 15%;
-    --sidebar-ring: 245 80% 60%;
+    /* Glow colors */
+    --glow-primary: 300 100% 60%;
+    --glow-accent: 217 91% 60%;
+    --recording: 217 91% 60%;
   }
 }
 
@@ -57,65 +53,127 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
-    font-family: 'Inter', sans-serif;
+    @apply bg-background text-foreground;
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-color: #000000;
   }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #222; border-radius: 99px; }
 }
 
 @layer utilities {
+  /* Neon magenta glow */
   .glow-primary {
-    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.4),
-                0 0 60px hsl(var(--glow-primary) / 0.15);
+    box-shadow:
+      0 0 20px rgba(255, 0, 255, 0.45),
+      0 0 60px rgba(255, 0, 255, 0.18),
+      0 0 100px rgba(255, 0, 255, 0.08);
   }
 
+  /* Electric blue glow */
   .glow-accent {
-    box-shadow: 0 0 15px hsl(var(--glow-accent) / 0.3),
-                0 0 40px hsl(var(--glow-accent) / 0.1);
+    box-shadow:
+      0 0 18px rgba(59, 130, 246, 0.5),
+      0 0 50px rgba(59, 130, 246, 0.2);
   }
 
+  /* Recording (blue) glow */
   .glow-recording {
-    box-shadow: 0 0 25px hsl(var(--recording) / 0.5),
-                0 0 80px hsl(var(--recording) / 0.2);
+    box-shadow:
+      0 0 24px rgba(59, 130, 246, 0.6),
+      0 0 60px rgba(59, 130, 246, 0.25);
   }
 
-  .scanline-overlay {
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      hsl(var(--primary) / 0.03) 2px,
-      hsl(var(--primary) / 0.03) 4px
-    );
+  /* Card glass style */
+  .card-glass {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+
+  /* Neon border on active card */
+  .border-neon {
+    border-color: rgba(255, 0, 255, 0.5);
+    box-shadow: 0 0 0 1px rgba(255, 0, 255, 0.15) inset, 0 0 20px rgba(255, 0, 255, 0.08);
+  }
+
+  /* Uppercase label style */
+  .label-caps {
+    @apply text-[10px] font-semibold tracking-widest uppercase text-muted-foreground;
+  }
+
+  /* Mono numbers */
+  .mono {
+    font-family: 'Space Mono', monospace;
   }
 }
 
+/* Mic pulse animation */
 @keyframes mic-pulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.4),
-                0 0 60px hsl(var(--glow-primary) / 0.15);
+    box-shadow: 0 0 30px rgba(255, 0, 255, 0.5), 0 0 70px rgba(255, 0, 255, 0.2);
   }
   50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 30px hsl(var(--glow-primary) / 0.6),
-                0 0 80px hsl(var(--glow-primary) / 0.25);
+    transform: scale(1.06);
+    box-shadow: 0 0 45px rgba(255, 0, 255, 0.7), 0 0 100px rgba(255, 0, 255, 0.3);
   }
 }
 
+/* Recording pulse (blue) */
 @keyframes mic-recording {
   0%, 100% {
-    box-shadow: 0 0 25px hsl(var(--recording) / 0.5),
-                0 0 80px hsl(var(--recording) / 0.2),
-                0 0 0 0 hsl(var(--recording) / 0.3);
+    box-shadow: 0 0 24px rgba(59,130,246,0.6), 0 0 60px rgba(59,130,246,0.25), 0 0 0 0 rgba(59,130,246,0.3);
   }
   50% {
-    box-shadow: 0 0 35px hsl(var(--recording) / 0.7),
-                0 0 100px hsl(var(--recording) / 0.3),
-                0 0 0 15px hsl(var(--recording) / 0);
+    box-shadow: 0 0 36px rgba(59,130,246,0.8), 0 0 90px rgba(59,130,246,0.35), 0 0 0 14px rgba(59,130,246,0);
   }
 }
 
+/* Live dot blink */
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.live-dot {
+  animation: live-blink 1.2s ease-in-out infinite;
+}
+
+/* Timer digit */
+@keyframes count-up {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Waveform bar */
 @keyframes wave-bar {
-  0%, 100% { height: 8px; }
-  50% { height: 24px; }
+  0%, 100% { height: 6px; }
+  50% { height: 28px; }
+}
+
+/* Fade in up */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s ease forwards;
+}
+
+/* Neon line shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer-line {
+  background: linear-gradient(90deg, transparent, rgba(255,0,255,0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
 }

@@ -15,175 +15,175 @@ interface RecordingOverlayProps {
 }
 
 export function RecordingOverlay({
-  isRecording,
-  isProcessing,
-  isTranscribing,
-  uploadedTranscript,
-  finalTranscript,
-  interimTranscript,
-  onStop,
-  onCancel,
-  onProcess,
+  isRecording, isProcessing, isTranscribing, uploadedTranscript,
+  finalTranscript, interimTranscript, onStop, onCancel, onProcess,
 }: RecordingOverlayProps) {
   const [editedTranscript, setEditedTranscript] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const wasRecordingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Live update while recording; capture full text (including interim) when recording stops
+  // Recording timer
+  useEffect(() => {
+    if (isRecording) {
+      setElapsedSeconds(0);
+      timerRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    } else {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isRecording]);
+
+  // Capture transcript on stop (including interim)
   useEffect(() => {
     if (isRecording) {
       setEditedTranscript(finalTranscript);
       wasRecordingRef.current = true;
     } else if (wasRecordingRef.current) {
-      // Just stopped — grab everything including any uncommitted interim words
-      const fullCapture = (finalTranscript + " " + interimTranscript).trim();
-      setEditedTranscript(fullCapture);
+      setEditedTranscript((finalTranscript + " " + interimTranscript).trim());
       wasRecordingRef.current = false;
     }
   }, [finalTranscript, interimTranscript, isRecording]);
 
-  // When an uploaded audio file is transcribed, populate the textarea
+  // Populate from uploaded file
   useEffect(() => {
-    if (uploadedTranscript) {
-      setEditedTranscript(uploadedTranscript);
-    }
+    if (uploadedTranscript) setEditedTranscript(uploadedTranscript);
   }, [uploadedTranscript]);
 
-  const fullText = (finalTranscript + " " + interimTranscript).trim();
-  const textForOrganize = editedTranscript || uploadedTranscript || fullText;
+  const displayText = editedTranscript || uploadedTranscript || (finalTranscript + " " + interimTranscript).trim();
+  const canOrganize = !isProcessing && !isTranscribing && displayText.trim();
 
-  // Determine what state we're in
-  const isInReviewMode = !isRecording && !isTranscribing && !isProcessing && (editedTranscript || uploadedTranscript || fullText);
-  const headerLabel = isProcessing ? "Organizing…"
-    : isTranscribing ? "Transcribing…"
-    : isRecording ? "Listening"
-    : "Review";
+  const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   return (
     <motion.div
-      initial={{ y: "100%" }}
-      animate={{ y: 0 }}
-      exit={{ y: "100%" }}
-      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-      className="fixed inset-0 z-50 bg-background flex flex-col"
+      initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 28, stiffness: 320 }}
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ background: "#000000" }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <button
-          onClick={onCancel}
-          disabled={isProcessing || isTranscribing}
-          className="p-2 rounded-full hover:bg-secondary transition-colors disabled:opacity-40"
-        >
-          <X className="w-6 h-6 text-muted-foreground" />
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 pt-12 pb-4">
+        <button onClick={onCancel} disabled={isProcessing || isTranscribing}
+          className="w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-40"
+          style={{ background: "#1a1a1a" }}>
+          <X className="w-4 h-4 text-zinc-400" />
         </button>
-        <span className="text-sm font-medium text-muted-foreground">{headerLabel}</span>
-        <div className="w-10" />
-      </div>
 
-      {/* Center content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
-
-        {/* Waveform while recording */}
-        {isRecording && <WaveformVisualizer />}
-
-        {/* Spinning indicator while processing or transcribing */}
-        {(isProcessing || isTranscribing) && (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="text-sm text-muted-foreground">
-              {isTranscribing ? "Transcribing your audio…" : "Organizing your items…"}
-            </p>
-          </div>
-        )}
-
-        {/* Transcript display / editable textarea */}
-        <div className="w-full max-w-md bg-secondary/30 rounded-2xl overflow-hidden">
-          {isRecording ? (
-            // Live transcript view while recording
-            <div className="min-h-[160px] p-5">
-              {!finalTranscript && !interimTranscript ? (
-                <p className="text-muted-foreground text-center text-sm pt-8">Start speaking…</p>
-              ) : (
-                <p className="text-sm leading-relaxed">
-                  {finalTranscript && <span className="text-foreground">{finalTranscript} </span>}
-                  {interimTranscript && <span className="text-muted-foreground italic">{interimTranscript}</span>}
-                </p>
-              )}
+        {/* LIVE badge + timer */}
+        <div className="flex items-center gap-3">
+          {isRecording && (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full" style={{ background: "#1a0505", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
+              <span className="text-[11px] font-bold text-red-400 tracking-widest">LIVE</span>
             </div>
-          ) : !isTranscribing ? (
-            // Review / edit mode
-            <div className="min-h-[160px] flex flex-col p-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 px-3 pt-2">
-                {uploadedTranscript && !editedTranscript ? "Transcribed — edit if needed" : "Review & edit before organizing"}
-              </p>
-              <textarea
-                value={editedTranscript}
-                onChange={(e) => setEditedTranscript(e.target.value)}
-                disabled={isProcessing}
-                autoFocus={!isRecording && !isTranscribing}
-                className="w-full flex-1 min-h-[120px] bg-transparent text-foreground text-sm leading-relaxed resize-none focus:outline-none p-3 border border-border/50 rounded-xl"
-                placeholder="Your transcript will appear here…"
-              />
+          )}
+          {isRecording && (
+            <span className="mono text-4xl font-bold text-white tracking-tight">{formatTime(elapsedSeconds)}</span>
+          )}
+          {isTranscribing && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full" style={{ background: "#0a0a1a", border: "1px solid rgba(59,130,246,0.3)" }}>
+              <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+              <span className="text-[11px] font-bold text-blue-400 tracking-widest">TRANSCRIBING</span>
             </div>
-          ) : (
-            // Blank placeholder while transcribing
-            <div className="min-h-[160px] flex items-center justify-center">
-              <p className="text-muted-foreground text-sm">Processing audio file…</p>
+          )}
+          {isProcessing && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full" style={{ background: "#130013", border: "1px solid rgba(255,0,255,0.3)" }}>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#ff00ff" }} />
+              <span className="text-[11px] font-bold tracking-widest" style={{ color: "#ff00ff" }}>ORGANIZING</span>
             </div>
           )}
         </div>
 
-        {/* Source label for uploads */}
-        {uploadedTranscript && !isTranscribing && (
-          <p className="text-xs text-muted-foreground/60 -mt-2">
-            ✦ Transcribed from uploaded audio
-          </p>
+        <div className="w-9" />
+      </div>
+
+      {/* Center content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-8">
+        {/* Waveform (recording only) */}
+        {isRecording && <WaveformVisualizer />}
+
+        {/* Transcript area */}
+        {isRecording ? (
+          <div className="w-full max-w-sm text-center">
+            {(!finalTranscript && !interimTranscript) ? (
+              <p className="text-zinc-600 text-lg">Listening…</p>
+            ) : (
+              <p className="text-white text-xl font-medium leading-relaxed text-center">
+                "{finalTranscript}<span className="text-zinc-500">{interimTranscript}</span>"
+              </p>
+            )}
+          </div>
+        ) : !isTranscribing ? (
+          <div className="w-full max-w-md">
+            <p className="label-caps mb-3 text-center">
+              {uploadedTranscript ? "TRANSCRIBED — EDIT IF NEEDED" : "REVIEW & EDIT"}
+            </p>
+            <div className="rounded-2xl overflow-hidden" style={{ background: "#0d0d0d", border: "1px solid #222" }}>
+              <textarea
+                value={editedTranscript}
+                onChange={(e) => setEditedTranscript(e.target.value)}
+                disabled={isProcessing}
+                autoFocus
+                rows={6}
+                className="w-full bg-transparent text-white text-sm leading-relaxed resize-none focus:outline-none p-5"
+                placeholder="Your transcript will appear here…"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              />
+            </div>
+            {uploadedTranscript && (
+              <p className="text-center text-xs text-zinc-600 mt-2">✦ Transcribed from uploaded audio</p>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)" }}>
+              <Loader2 className="w-7 h-7 text-blue-400 animate-spin" />
+            </div>
+            <p className="text-zinc-500 text-sm">Processing audio…</p>
+          </div>
         )}
       </div>
 
-      {/* Action buttons */}
-      <div className="flex justify-center pb-12 gap-4">
+      {/* Bottom actions */}
+      <div className="flex items-center justify-center gap-5 pb-16 px-6">
         {isRecording ? (
-          // Stop recording button
-          <button
-            onClick={onStop}
-            className="w-16 h-16 rounded-full bg-recording flex items-center justify-center glow-recording transition-transform active:scale-95"
-          >
-            <Square className="w-6 h-6 text-foreground fill-foreground" />
+          // Stop button — large blue circle like reference
+          <button onClick={onStop}
+            className="w-20 h-20 rounded-full flex items-center justify-center transition-transform active:scale-90 glow-recording"
+            style={{ background: "#3b82f6" }}>
+            <Square className="w-7 h-7 text-white fill-white" />
           </button>
-        ) : !isTranscribing ? (
+        ) : !isTranscribing && (
           // Organize button
           <button
-            onClick={() => onProcess(textForOrganize)}
-            disabled={isProcessing || !textForOrganize.trim()}
-            className="h-14 px-8 rounded-full bg-primary text-primary-foreground font-semibold flex items-center gap-3 shadow-lg glow-primary disabled:opacity-40 transition-transform active:scale-95"
-          >
-            {isProcessing ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
+            onClick={() => onProcess(displayText)}
+            disabled={!canOrganize}
+            className="h-14 px-10 rounded-full font-bold text-white flex items-center gap-3 text-base transition-all active:scale-95 disabled:opacity-40"
+            style={{
+              background: canOrganize ? "linear-gradient(135deg,#ff00ff,#bf00ff)" : "#222",
+              boxShadow: canOrganize ? "0 0 30px rgba(255,0,255,0.4), 0 0 60px rgba(255,0,255,0.15)" : "none",
+            }}>
+            {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             {isProcessing ? "Organizing…" : "Organize"}
           </button>
-        ) : null}
+        )}
       </div>
     </motion.div>
   );
 }
 
 function WaveformVisualizer() {
+  const bars = 24;
   return (
-    <div className="flex items-center gap-[3px] h-16">
-      {Array.from({ length: 20 }).map((_, i) => (
+    <div className="flex items-end gap-[3px] h-14">
+      {Array.from({ length: bars }).map((_, i) => (
         <motion.div
           key={i}
-          className="w-[3px] rounded-full bg-primary"
-          animate={{ height: [8, Math.random() * 48 + 12, 8] }}
-          transition={{
-            duration: 0.5 + Math.random() * 0.4,
-            repeat: Infinity,
-            delay: i * 0.04,
-            ease: "easeInOut",
-          }}
+          className="flex-1 rounded-full"
+          style={{ background: i % 3 === 0 ? "#3b82f6" : i % 3 === 1 ? "#60a5fa" : "#1d4ed8", minHeight: "4px" }}
+          animate={{ height: ["6px", `${Math.random() * 40 + 8}px`, "6px"] }}
+          transition={{ duration: 0.45 + Math.random() * 0.35, repeat: Infinity, delay: i * 0.035, ease: "easeInOut" }}
         />
       ))}
     </div>
