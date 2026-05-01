@@ -144,7 +144,12 @@ export async function syncGCalToLocal(): Promise<number> {
           }))
       );
       const { error } = await supabase.from("items").upsert(rows as any, { onConflict: "id" });
-      if (error) console.error("Failed to upsert GCal events:", error);
+      if (error) {
+        console.error("Failed to upsert GCal events:", error.message, error.details, error.hint);
+      } else {
+        // Notify all tabs to re-fetch so GCal events appear immediately
+        window.dispatchEvent(new CustomEvent("items-updated"));
+      }
     }
 
     const { data: storedGCalItems } = await supabase

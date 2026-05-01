@@ -4,7 +4,7 @@ import {
   isSameMonth, startOfWeek, endOfWeek, parseISO, addDays,
   setHours,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil, RefreshCw } from "lucide-react";
 import { useSyncedItems } from "@/hooks/useSyncedItems";
 import { syncGCalToLocal, createGCalEvent, deleteGCalEvent } from "@/lib/gcal";
 import { saveItems, updateItem, deleteItem } from "@/lib/storage";
@@ -31,7 +31,21 @@ export function CalendarTab() {
   const [newEvent, setNewEvent] = useState({
     title: "", content: "", date: "", startTime: "09:00", endTime: "10:00", color: DEFAULT_EVENT_COLOR,
   });
-  const { items: history, loading, refresh } = useSyncedItems();
+  const { items: history, loading } = useSyncedItems();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    try {
+      const count = await syncGCalToLocal();
+      if (count > 0) toast.success(`Synced ${count} events from Google Calendar`);
+      else toast.info("Google Calendar is up to date");
+    } catch (e: any) {
+      toast.error(e.message || "Sync failed — check your Google Calendar connection in Settings");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const events = useMemo(() => history.filter((i) => i.type === "Calendar Event" && i.datetime), [history]);
 
@@ -99,7 +113,6 @@ export function CalendarTab() {
       };
       await saveItems([item]);
       toast.success("Event created");
-      // Push to Google Calendar in background
       createGCalEvent({
         title: item.title,
         description: item.content,
@@ -108,42 +121,52 @@ export function CalendarTab() {
       }).catch((err) => console.error("GCal push failed:", err));
     }
     setShowEventModal(false);
-    refresh();
   };
 
   const handleDeleteEvent = async () => {
     if (!selectedEvent) return;
     await deleteItem(selectedEvent.id);
-    // Also delete from Google Calendar if it was synced there
     if (selectedEvent.google_calendar_event_id) {
       deleteGCalEvent(selectedEvent.google_calendar_event_id).catch(() => {});
     }
     toast.success("Event deleted");
     setShowDetailModal(false);
-    refresh();
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#ff00ff", borderTopColor: "transparent" }} />
+      </div>
+    );
   }
 
   return (
     <div className="px-4 pt-4 pb-36 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between pr-12">
-        <h1 className="text-xl font-bold text-foreground">Calendar</h1>
-        <div className="flex bg-secondary rounded-lg p-0.5">
-          {(["M", "W", "D"] as CalView[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
+      <div className="flex items-center justify-between pr-12 pb-2">
+        <div>
+          <p className="label-caps mb-1">CALENDAR</p>
+          <h1 className="text-2xl font-bold text-white">Timeline</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Sync button */}
+          <button onClick={handleManualSync} disabled={syncing}
+            title="Sync from Google Calendar"
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50"
+            style={{ background: "#111", border: "1px solid #222" }}>
+            <RefreshCw className={`w-4 h-4 text-zinc-400 ${syncing ? "animate-spin" : ""}`} />
+          </button>
+          {/* View toggle */}
+          <div className="flex rounded-xl overflow-hidden" style={{ background: "#111", border: "1px solid #222" }}>
+            {(["M", "W", "D"] as CalView[]).map((v) => (
+              <button key={v} onClick={() => setView(v)}
+                className="px-3 py-2 text-xs font-bold tracking-wider transition-colors"
+                style={view === v ? { background: "rgba(255,0,255,0.15)", color: "#ff00ff" } : { color: "#555" }}>
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
