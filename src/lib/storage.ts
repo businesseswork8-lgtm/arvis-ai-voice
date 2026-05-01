@@ -51,6 +51,23 @@ export async function getHistory(): Promise<SavedItem[]> {
     done: row.done || false,
   }));
 }
+// ─── Timezone helper ─────────────────────────────────────
+// Supabase timestamptz columns: if we save "2026-05-02T09:00:00" with no offset,
+// Postgres assumes UTC — which makes 9 AM show as 2:30 PM in IST (UTC+5:30).
+// This helper stamps the LOCAL timezone offset onto bare datetime strings.
+export function localDatetimeToISO(datetime: string | null | undefined): string | null {
+  if (!datetime) return null;
+  // Already has timezone info (Z, +HH:MM, -HH:MM) — leave unchanged
+  if (/Z$|[+-]\d{2}:\d{2}$/.test(datetime)) return datetime;
+  // No offset — add local offset so Postgres stores the right UTC equivalent
+  const offsetMin = new Date().getTimezoneOffset(); // e.g. -330 for IST
+  const sign = offsetMin <= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMin);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `${datetime}${sign}${hh}:${mm}`;
+}
+
 
 export async function saveItems(items: SavedItem[]) {
   const syncKey = getSyncKey();
@@ -61,8 +78,8 @@ export async function saveItems(items: SavedItem[]) {
     folder: item.type === "Note" ? (item.folder || null) : null,
     title: item.title,
     content: item.content || "",
-    datetime: item.datetime || null,
-    end_datetime: item.end_datetime || null,
+    datetime: localDatetimeToISO(item.datetime),
+    end_datetime: localDatetimeToISO(item.end_datetime),
     event_color: item.event_color || null,
     done: item.done || false,
     confirmed: true,
@@ -86,7 +103,11 @@ export async function toggleItemDone(id: string) {
 }
 
 export async function updateItem(id: string, updates: Record<string, any>) {
-  const { error } = await supabase.from("items").update(updates).eq("id", id);
+  // Fix timezone for any datetime fields in updates
+  const sanitized = { ...updates };
+  if ("datetime" in sanitized) sanitized.datetime = localDatetimeToISO(sanitized.datetime);
+  if ("end_datetime" in sanitized) sanitized.end_datetime = localDatetimeToISO(sanitized.end_datetime);
+  const { error } = await supabase.from("items").update(sanitized).eq("id", id);
   if (error) console.error("Failed to update item:", error);
   else window.dispatchEvent(new CustomEvent("items-updated"));
 }
