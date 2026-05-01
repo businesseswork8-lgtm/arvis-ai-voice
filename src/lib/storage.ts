@@ -97,7 +97,7 @@ export async function updateItem(id: string, updates: Record<string, any>) {
   const sanitized = { ...updates };
   if ("datetime" in sanitized) sanitized.datetime = localDatetimeToISO(sanitized.datetime);
   if ("end_datetime" in sanitized) sanitized.end_datetime = localDatetimeToISO(sanitized.end_datetime);
-  const { error } = await supabase.from("items").update(sanitized).eq("id", id);
+  const { error } = await supabase.from("items").update(sanitized as any).eq("id", id);
   if (error) console.error("Failed to update item:", error);
   else window.dispatchEvent(new CustomEvent("items-updated"));
 }
