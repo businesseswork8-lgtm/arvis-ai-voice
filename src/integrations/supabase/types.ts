@@ -21,7 +21,7 @@ export type Database = {
           google_email: string | null
           id: string
           refresh_token: string
-          sync_key: string
+          sync_key: string | null
           token_expires_at: string
           updated_at: string
           user_id: string | null
@@ -32,7 +32,7 @@ export type Database = {
           google_email?: string | null
           id?: string
           refresh_token: string
-          sync_key: string
+          sync_key?: string | null
           token_expires_at: string
           updated_at?: string
           user_id?: string | null
@@ -43,7 +43,7 @@ export type Database = {
           google_email?: string | null
           id?: string
           refresh_token?: string
-          sync_key?: string
+          sync_key?: string | null
           token_expires_at?: string
           updated_at?: string
           user_id?: string | null
@@ -63,7 +63,7 @@ export type Database = {
           google_calendar_event_id: string | null
           id: string
           parent_id: string | null
-          sync_key: string
+          sync_key: string | null
           title: string
           type: string
           updated_at: string
@@ -81,7 +81,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           id?: string
           parent_id?: string | null
-          sync_key: string
+          sync_key?: string | null
           title: string
           type: string
           updated_at?: string
@@ -99,7 +99,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           id?: string
           parent_id?: string | null
-          sync_key?: string
+          sync_key?: string | null
           title?: string
           type?: string
           updated_at?: string
