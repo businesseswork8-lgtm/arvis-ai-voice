@@ -7,7 +7,6 @@ import { Plus, Pencil, Trash2, X, ChevronDown, ChevronRight, Check } from "lucid
 import { SavedItem } from "@/lib/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getSyncKey } from "@/lib/storage";
 
 type TaskFilter = "overdue" | "today" | "future";
 
@@ -79,8 +78,10 @@ export function TasksTab() {
   const handleAddSubTask = async (parentId: string) => {
     const title = subTaskInputs[parentId]?.trim();
     if (!title) return;
-    const syncKey = getSyncKey();
-    const { error } = await supabase.from("items").insert({ id: crypto.randomUUID(), sync_key: syncKey, type: "Task", title, parent_id: parentId, done: false, confirmed: true });
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) { toast.error("Not signed in"); return; }
+    const { error } = await supabase.from("items").insert({ id: crypto.randomUUID(), user_id: userId, type: "Task", title, parent_id: parentId, done: false, confirmed: true });
     if (error) { console.error(error); return; }
     setSubTaskInputs((prev) => ({ ...prev, [parentId]: "" }));
     toast.success("Sub-task added");
