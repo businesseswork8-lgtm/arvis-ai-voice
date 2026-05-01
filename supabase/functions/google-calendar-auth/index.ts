@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { action, code, redirect_uri, sync_key } = await req.json()
+    const { action, code, redirect_uri, user_id } = await req.json()
 
     if (action === 'get_auth_url') {
       const scopes = [
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
         scope: scopes.join(' '),
         access_type: 'offline',
         prompt: 'consent',
-        state: sync_key,
+        state: user_id,
       })
       const url = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
       return new Response(JSON.stringify({ url }), {
@@ -82,12 +82,12 @@ Deno.serve(async (req) => {
       const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
       const { error } = await supabase.from('google_calendar_connections').upsert({
-        sync_key,
+        user_id,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expires_at: expiresAt,
         google_email: user.email,
-      }, { onConflict: 'sync_key' })
+      }, { onConflict: 'user_id' })
 
       if (error) {
         return new Response(JSON.stringify({ error: `Failed to store tokens: ${error.message}` }), {
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
 
     if (action === 'disconnect') {
       const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
-      await supabase.from('google_calendar_connections').delete().eq('sync_key', sync_key)
+      await supabase.from('google_calendar_connections').delete().eq('user_id', user_id)
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
