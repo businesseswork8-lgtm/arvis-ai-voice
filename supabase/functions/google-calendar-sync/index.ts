@@ -97,17 +97,26 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create_event') {
+      const tz = event.timezone || 'UTC'
+
+      // Strip any UTC offset/Z suffix — we rely on timeZone field, not embedded offset
+      const stripTz = (dt: string) => dt ? dt.replace(/([+-]\d{2}:\d{2}|Z)$/, '') : dt
+
+      const startLocal = stripTz(event.start_datetime)
+      // Add 1hr in local time string format (avoid UTC conversion)
+      const endLocal = event.end_datetime
+        ? stripTz(event.end_datetime)
+        : (() => {
+            const d = new Date(startLocal + 'Z') // parse as if UTC just to do arithmetic
+            d.setUTCHours(d.getUTCHours() + 1)
+            return startLocal.slice(0, 11) + d.toISOString().slice(11, 19) // keep same date/time format
+          })()
+
       const gcalEvent = {
         summary: event.title,
         description: event.description || '',
-        start: {
-          dateTime: event.start_datetime,
-          timeZone: event.timezone || 'UTC',
-        },
-        end: {
-          dateTime: event.end_datetime || new Date(new Date(event.start_datetime).getTime() + 3600000).toISOString(),
-          timeZone: event.timezone || 'UTC',
-        },
+        start: { dateTime: startLocal, timeZone: tz },
+        end: { dateTime: endLocal, timeZone: tz },
       }
 
       const res = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events`, {
@@ -130,17 +139,22 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'update_event') {
+      const tz = event.timezone || 'UTC'
+      const stripTz = (dt: string) => dt ? dt.replace(/([+-]\d{2}:\d{2}|Z)$/, '') : dt
+      const startLocal = stripTz(event.start_datetime)
+      const endLocal = event.end_datetime
+        ? stripTz(event.end_datetime)
+        : (() => {
+            const d = new Date(startLocal + 'Z')
+            d.setUTCHours(d.getUTCHours() + 1)
+            return startLocal.slice(0, 11) + d.toISOString().slice(11, 19)
+          })()
+
       const gcalEvent = {
         summary: event.title,
         description: event.description || '',
-        start: {
-          dateTime: event.start_datetime,
-          timeZone: event.timezone || 'UTC',
-        },
-        end: {
-          dateTime: event.end_datetime || new Date(new Date(event.start_datetime).getTime() + 3600000).toISOString(),
-          timeZone: event.timezone || 'UTC',
-        },
+        start: { dateTime: startLocal, timeZone: tz },
+        end: { dateTime: endLocal, timeZone: tz },
       }
 
       const res = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events/${event.google_event_id}`, {
