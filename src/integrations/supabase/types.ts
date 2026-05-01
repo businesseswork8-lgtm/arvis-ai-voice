@@ -21,9 +21,10 @@ export type Database = {
           google_email: string | null
           id: string
           refresh_token: string
-          sync_key: string
+          sync_key: string | null
           token_expires_at: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           access_token: string
@@ -31,9 +32,10 @@ export type Database = {
           google_email?: string | null
           id?: string
           refresh_token: string
-          sync_key: string
+          sync_key?: string | null
           token_expires_at: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           access_token?: string
@@ -41,9 +43,10 @@ export type Database = {
           google_email?: string | null
           id?: string
           refresh_token?: string
-          sync_key?: string
+          sync_key?: string | null
           token_expires_at?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -60,10 +63,11 @@ export type Database = {
           google_calendar_event_id: string | null
           id: string
           parent_id: string | null
-          sync_key: string
+          sync_key: string | null
           title: string
           type: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           confirmed?: boolean
@@ -77,10 +81,11 @@ export type Database = {
           google_calendar_event_id?: string | null
           id?: string
           parent_id?: string | null
-          sync_key: string
+          sync_key?: string | null
           title: string
           type: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           confirmed?: boolean
@@ -94,10 +99,11 @@ export type Database = {
           google_calendar_event_id?: string | null
           id?: string
           parent_id?: string | null
-          sync_key?: string
+          sync_key?: string | null
           title?: string
           type?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -130,6 +136,30 @@ export type Database = {
           id?: string
           subscription?: Json
           sync_key?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          api_key: string
+          created_at: string
+          model: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string
+          created_at?: string
+          model?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          model?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

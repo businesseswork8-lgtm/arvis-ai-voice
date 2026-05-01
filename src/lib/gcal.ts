@@ -1,24 +1,30 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getSyncKey } from "./storage";
+
+async function getUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
 
 export async function getGCalConnection() {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) return null;
   const { data } = await supabase
     .from("google_calendar_connections")
     .select("google_email")
-    .eq("sync_key", syncKey)
-    .single();
+    .eq("user_id", userId)
+    .maybeSingle();
   return data;
 }
 
 export async function startGCalAuth() {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) throw new Error("Not signed in");
   const redirectUri = `${window.location.origin}/`;
 
   const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
     body: {
       action: "get_auth_url",
-      sync_key: syncKey,
+      user_id: userId,
       redirect_uri: redirectUri,
     },
   });
@@ -32,26 +38,29 @@ export async function startGCalAuth() {
 }
 
 export async function exchangeGCalCode(code: string) {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) throw new Error("Not signed in");
   const redirectUri = `${window.location.origin}/`;
   const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
-    body: { action: "exchange_code", code, sync_key: syncKey, redirect_uri: redirectUri },
+    body: { action: "exchange_code", code, user_id: userId, redirect_uri: redirectUri },
   });
   if (error) throw new Error(error.message);
   return data;
 }
 
 export async function disconnectGCal() {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) return;
   await supabase.functions.invoke("google-calendar-auth", {
-    body: { action: "disconnect", sync_key: syncKey },
+    body: { action: "disconnect", user_id: userId },
   });
 }
 
 export async function fetchGCalEvents() {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) return [];
   const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
-    body: { action: "list_events", sync_key: syncKey },
+    body: { action: "list_events", user_id: userId },
   });
   if (error) throw new Error(error.message);
   return data?.events || [];
@@ -63,10 +72,11 @@ export async function createGCalEvent(event: {
   start_datetime: string;
   end_datetime?: string;
 }) {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) return null;
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
-    body: { action: "create_event", sync_key: syncKey, event: { ...event, timezone: tz } },
+    body: { action: "create_event", user_id: userId, event: { ...event, timezone: tz } },
   });
   if (error) throw new Error(error.message);
   return data?.google_event_id;
@@ -79,23 +89,24 @@ export async function updateGCalEvent(event: {
   start_datetime: string;
   end_datetime?: string;
 }) {
-  const syncKey = getSyncKey();
+  const userId = await getUserId();
+  if (!userId) return;
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
-    body: { action: "update_event", sync_key: syncKey, event: { ...event, timezone: tz } },
+  const { error } = await supabase.functions.invoke("google-calendar-sync", {
+    body: { action: "update_event", user_id: userId, event: { ...event, timezone: tz } },
   });
   if (error) throw new Error(error.message);
 }
 
 export async function deleteGCalEvent(googleEventId: string) {
-  const syncKey = getSyncKey();
-  const { data, error } = await supabase.functions.invoke("google-calendar-sync", {
-    body: { action: "delete_event", sync_key: syncKey, event: { google_event_id: googleEventId } },
+  const userId = await getUserId();
+  if (!userId) return;
+  const { error } = await supabase.functions.invoke("google-calendar-sync", {
+    body: { action: "delete_event", user_id: userId, event: { google_event_id: googleEventId } },
   });
   if (error) throw new Error(error.message);
 }
 
-// Converts a GCal event ID string into a deterministic valid UUID (no schema migration needed)
 async function gcalIdToUUID(gcalEventId: string): Promise<string> {
   const data = new TextEncoder().encode("declutter:gcal:" + gcalEventId);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -107,22 +118,19 @@ async function gcalIdToUUID(gcalEventId: string): Promise<string> {
   }${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
-// Syncs Google Calendar ↔ Supabase:
-// - Upserts current GCal events into items table (deterministic UUID = no duplicates)
-// - Deletes items that were removed from Google Calendar
 export async function syncGCalToLocal(): Promise<number> {
   try {
-    const syncKey = getSyncKey();
+    const userId = await getUserId();
+    if (!userId) return 0;
     const events = await fetchGCalEvents();
 
-    // Upsert current GCal events
     if (events && events.length > 0) {
       const rows = await Promise.all(
         events
           .filter((e: any) => e.start?.dateTime || e.start?.date)
           .map(async (e: any) => ({
             id: await gcalIdToUUID(e.id),
-            sync_key: syncKey,
+            user_id: userId,
             type: "Calendar Event",
             folder: null,
             title: e.summary || "(No title)",
@@ -135,15 +143,14 @@ export async function syncGCalToLocal(): Promise<number> {
             confirmed: true,
           }))
       );
-      const { error } = await supabase.from("items").upsert(rows, { onConflict: "id" });
+      const { error } = await supabase.from("items").upsert(rows as any, { onConflict: "id" });
       if (error) console.error("Failed to upsert GCal events:", error);
     }
 
-    // Delete items that no longer exist in Google Calendar
     const { data: storedGCalItems } = await supabase
       .from("items")
       .select("id, google_calendar_event_id")
-      .eq("sync_key", syncKey)
+      .eq("user_id", userId)
       .not("google_calendar_event_id", "is", null);
 
     if (storedGCalItems && storedGCalItems.length > 0) {

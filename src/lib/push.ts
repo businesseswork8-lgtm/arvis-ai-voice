@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getSyncKey } from "./storage";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "BM3MW6q_AgtETbBZNtIOtiBaBliOJcdyLFvzkv3NB6aCE9h6tkXBFAondxd4-SaULDlZdUa_x6PB6y21EcuBmpY";
 
@@ -16,6 +15,11 @@ export async function registerPushSubscription() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
   try {
+    // Only register for signed-in users
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
     // Request notification permission
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return;
@@ -34,12 +38,11 @@ export async function registerPushSubscription() {
       });
     }
 
-    // Save to Supabase
-    const syncKey = getSyncKey();
+    // Save to Supabase (sync_key column stores the authenticated user id)
     const subJson = subscription.toJSON() as Record<string, unknown>;
     await supabase.from("push_subscriptions").upsert(
       [{
-        sync_key: syncKey,
+        sync_key: userId,
         endpoint: subscription.endpoint,
         subscription: subJson as any,
       }],

@@ -8,11 +8,11 @@ const corsHeaders = {
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
-async function getValidToken(supabase: any, syncKey: string): Promise<{ token: string } | { error: string }> {
+async function getValidToken(supabase: any, userId: string): Promise<{ token: string } | { error: string }> {
   const { data: conn } = await supabase
     .from('google_calendar_connections')
     .select('*')
-    .eq('sync_key', syncKey)
+    .eq('user_id', userId)
     .single()
 
   if (!conn) return { error: 'Not connected to Google Calendar' }
@@ -41,7 +41,7 @@ async function getValidToken(supabase: any, syncKey: string): Promise<{ token: s
     await supabase.from('google_calendar_connections').update({
       access_token: tokens.access_token,
       token_expires_at: expiresAt,
-    }).eq('sync_key', syncKey)
+    }).eq('user_id', userId)
 
     return { token: tokens.access_token }
   }
@@ -59,9 +59,9 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const { action, sync_key, event } = await req.json()
+    const { action, user_id, event } = await req.json()
 
-    const tokenResult = await getValidToken(supabase, sync_key)
+    const tokenResult = await getValidToken(supabase, user_id)
     if ('error' in tokenResult) {
       return new Response(JSON.stringify({ error: tokenResult.error }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

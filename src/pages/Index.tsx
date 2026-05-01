@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { BottomNav, TabKey } from "@/components/BottomNav";
 import { HomeTab } from "@/components/HomeTab";
 import { CalendarTab } from "@/components/CalendarTab";
@@ -8,17 +9,22 @@ import { NotesTab } from "@/components/NotesTab";
 import { RecordingOverlay } from "@/components/RecordingOverlay";
 import { ExtractedCard } from "@/components/ExtractedCard";
 import { SettingsView } from "@/components/SettingsView";
+import { AuthScreen } from "@/components/AuthScreen";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { extractItems, transcribeAudioFile } from "@/lib/ai";
-import { getSettings, saveItems, updateItem } from "@/lib/storage";
+import { getUserSettings, saveItems, updateItem } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { ExtractedItem, SavedItem } from "@/lib/types";
 import { exchangeGCalCode, createGCalEvent, getGCalConnection, syncGCalToLocal } from "@/lib/gcal";
 import { registerPushSubscription } from "@/lib/push";
-import { Mic, Settings, CheckCheck, Upload } from "lucide-react";
+import { Mic, Settings, CheckCheck, Upload, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
 export default function Index() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userSettings, setUserSettings] = useState<{ apiKey: string; model: string }>({ apiKey: "", model: "gemini-2.0-flash" });
   const [tab, setTab] = useState<TabKey>("home");
   const [showSettings, setShowSettings] = useState(false);
   const [showRecording, setShowRecording] = useState(false);
@@ -30,7 +36,29 @@ export default function Index() {
 
   const { isRecording, interimTranscript, finalTranscript, startRecording, stopRecording, cancelRecording, resetTranscript } = useVoiceRecording();
 
+  // Auth gate: subscribe BEFORE getSession to avoid races
   useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthChecked(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Refresh settings + listen for in-app updates whenever user changes
+  useEffect(() => {
+    if (!session) return;
+    getUserSettings().then(setUserSettings);
+    const onItems = () => { /* settings cached separately */ };
+    window.addEventListener("settings-updated", () => getUserSettings().then(setUserSettings));
+    return () => window.removeEventListener("settings-updated", onItems);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session) return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code) {
@@ -42,9 +70,9 @@ export default function Index() {
     } else {
       syncGCalToLocal().catch(() => {});
     }
-  }, []);
+  }, [session]);
 
-  useEffect(() => { registerPushSubscription(); }, []);
+  useEffect(() => { if (session) registerPushSubscription(); }, [session]);
 
   const handleMicPress = () => { setUploadedTranscript(null); setShowRecording(true); startRecording(); };
   const handleUploadPress = () => fileInputRef.current?.click();
@@ -53,7 +81,7 @@ export default function Index() {
     const file = e.target.files?.[0];
     (e.target as HTMLInputElement).value = "";
     if (!file) return;
-    const settings = getSettings();
+    const settings = await getUserSettings();
     if (!settings.apiKey) { toast.error("Add your Gemini API key in Settings first"); return; }
     setUploadedTranscript(null); setIsTranscribing(true); setShowRecording(true);
     try {
@@ -71,7 +99,7 @@ export default function Index() {
 
   const handleProcess = useCallback(async (textToProcess: string) => {
     if (!textToProcess?.trim()) { toast.error("No text detected. Try again."); setShowRecording(false); return; }
-    const settings = getSettings();
+    const settings = await getUserSettings();
     if (!settings.apiKey) { toast.error("Add your Gemini API key in Settings."); setShowRecording(false); return; }
     setIsProcessing(true);
     try {
@@ -116,7 +144,17 @@ export default function Index() {
     saved.forEach((s) => syncToGCal(s));
   };
 
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#000000" }}>
+        <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+      </div>
+    );
+  }
+  if (!session) return <AuthScreen />;
   if (showSettings) return <SettingsView onBack={() => setShowSettings(false)} />;
+  // userSettings is loaded in background; it's used implicitly by handlers
+  void userSettings;
 
   const activeItems = items.filter((i) => !i.dismissed);
 
