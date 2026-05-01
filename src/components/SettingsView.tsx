@@ -1,39 +1,38 @@
 import { useState, useEffect } from "react";
-import { getSettings, saveSettings, clearHistory, getSyncKey, setSyncKey } from "@/lib/storage";
+import { getUserSettings, saveUserSettings, clearHistory } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { getGCalConnection, startGCalAuth, disconnectGCal } from "@/lib/gcal";
 import { FolderManager } from "@/components/FolderManager";
-import { ArrowLeft, Trash2, Copy, RefreshCw, FolderOpen, Calendar, Unlink, Key, Cpu, Link2 } from "lucide-react";
+import { ArrowLeft, Trash2, FolderOpen, Calendar, Unlink, Key, Cpu, Link2, LogOut, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface SettingsViewProps { onBack: () => void; }
 
 export function SettingsView({ onBack }: SettingsViewProps) {
-  const [settings, setSettings] = useState(getSettings);
-  const [syncKey, setSyncKeyState] = useState(getSyncKey);
-  const [editSyncKey, setEditSyncKey] = useState("");
-  const [showEditSync, setShowEditSync] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("gemini-2.0-flash");
+  const [loading, setLoading] = useState(true);
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [gcalEmail, setGcalEmail] = useState<string | null>(null);
   const [gcalLoading, setGcalLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
+    (async () => {
+      const s = await getUserSettings();
+      setApiKey(s.apiKey);
+      setModel(s.model);
+      setLoading(false);
+      const { data } = await supabase.auth.getUser();
+      setUserEmail(data.user?.email ?? null);
+    })();
     getGCalConnection().then((conn) => { if (conn?.google_email) setGcalEmail(conn.google_email); });
   }, []);
 
-  const save = (updated: typeof settings) => { setSettings(updated); saveSettings(updated); };
-  const copySyncKey = () => { navigator.clipboard.writeText(syncKey); toast.success("Sync key copied!"); };
-
-  const applySyncKey = () => {
-    const trimmed = editSyncKey.trim();
-    if (!trimmed) return;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
-      toast.error("Invalid sync key format (must be a UUID)");
-      return;
-    }
-    setSyncKey(trimmed); setSyncKeyState(trimmed); setShowEditSync(false); setEditSyncKey("");
-    toast.success("Sync key updated — reloading…");
-    window.location.reload();
+  const persist = async (nextKey: string, nextModel: string) => {
+    setApiKey(nextKey); setModel(nextModel);
+    await saveUserSettings(nextKey, nextModel);
   };
 
   const handleConnectGCal = async () => {
@@ -45,6 +44,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setGcalLoading(true);
     try { await disconnectGCal(); setGcalEmail(null); toast.success("Disconnected"); } catch { toast.error("Failed to disconnect"); }
     finally { setGcalLoading(false); }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   return (
@@ -61,13 +65,30 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-16">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
+          </div>
+        ) : (
+        <>
+        {/* Account */}
+        <Section label="ACCOUNT">
+          <Row icon={<LogOut className="w-4 h-4" />} title={userEmail || "Signed in"} sub="Sign out of this device">
+            <button onClick={handleSignOut}
+              className="mt-2 flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors">
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
+            </button>
+          </Row>
+        </Section>
+
         {/* AI Configuration */}
         <Section label="AI CONFIGURATION">
           <Row icon={<Key className="w-4 h-4" />} title="Gemini API Key" sub="Required for AI extraction">
             <input
               type="password"
-              value={settings.apiKey}
-              onChange={(e) => save({ ...settings, apiKey: e.target.value })}
+              value={apiKey}
+              onChange={(e) => persist(e.target.value, model)}
               placeholder="AIza…"
               className="w-full bg-transparent text-white text-sm placeholder-zinc-700 focus:outline-none mt-2"
             />
@@ -79,8 +100,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
           <Row icon={<Cpu className="w-4 h-4" />} title="AI Model" sub="Default: gemini-2.0-flash">
             <input
-              value={settings.model}
-              onChange={(e) => save({ ...settings, model: e.target.value })}
+              value={model}
+              onChange={(e) => persist(apiKey, e.target.value)}
               className="w-full bg-transparent text-white text-sm placeholder-zinc-700 focus:outline-none mt-2"
             />
           </Row>
@@ -115,42 +136,6 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </Row>
         </Section>
 
-        {/* Sync */}
-        <Section label="SYNC & DEVICES">
-          <Row icon={<RefreshCw className="w-4 h-4 text-zinc-400" />} title="Sync Key" sub="Use this key on any device to access your data">
-            <div className="mt-2 flex items-center gap-2">
-              <code className="flex-1 text-xs rounded-lg px-3 py-2.5 font-mono break-all select-all"
-                style={{ background: "#111", border: "1px solid #222", color: "#aaa" }}>
-                {syncKey}
-              </code>
-              <button onClick={copySyncKey}
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "#111", border: "1px solid #222" }}>
-                <Copy className="w-4 h-4 text-zinc-500" />
-              </button>
-            </div>
-            {!showEditSync ? (
-              <button onClick={() => setShowEditSync(true)}
-                className="mt-2 text-xs text-zinc-600 hover:text-zinc-400 flex items-center gap-1.5 transition-colors">
-                <RefreshCw className="w-3 h-3" /> Use a different sync key
-              </button>
-            ) : (
-              <div className="mt-3 space-y-2">
-                <p className="text-xs text-zinc-600">Paste a sync key from another device:</p>
-                <div className="flex gap-2">
-                  <input value={editSyncKey} onChange={(e) => setEditSyncKey(e.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500/40" />
-                  <button onClick={applySyncKey}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold text-white"
-                    style={{ background: "#3b82f6" }}>Apply</button>
-                </div>
-                <button onClick={() => setShowEditSync(false)} className="text-xs text-zinc-700 hover:text-zinc-500">Cancel</button>
-              </div>
-            )}
-          </Row>
-        </Section>
-
         {/* Danger zone */}
         <div className="mx-4 mt-4 mb-4">
           <p className="label-caps text-red-900 mb-3">DANGER ZONE</p>
@@ -166,6 +151,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             Delete All Data
           </button>
         </div>
+        </>
+        )}
       </div>
 
       <FolderManager open={showFolderManager} onOpenChange={setShowFolderManager} onFoldersChanged={() => forceUpdate((n) => n + 1)} />
